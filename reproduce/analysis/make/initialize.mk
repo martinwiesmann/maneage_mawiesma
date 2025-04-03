@@ -285,7 +285,7 @@ distclean: clean
 #	'rm' program. So for this recipe, we'll use the host system's 'rm',
 #	not our own.
 	$$sys_rm -rf $(BDIR)
-	$$sys_rm -f .local .build $(pconfdir)/LOCAL.conf
+	$$sys_rm -f .local .build
 
 
 
@@ -521,7 +521,10 @@ $(inputdatasets): $(indir)/%: | $(indir) $(lockdir)
 
 #	    Unrecognized format.
 	    *)
-	    echo "Maneage: 'DATABASEAUTHTYPE' format not recognized! Please see the description of this variable in 'reproduce/software/config/LOCAL.conf' for the acceptable values."; exit 1;;
+	    printf "Maneage: 'DATABASEAUTHTYPE' format not recognized! "
+	    printf "Please see the description of this variable in "
+	    printf "'$(bsdir)/config/LOCAL.conf' for the acceptable "
+	    printf "values."; exit 1;;
 	  esac
 	fi
 

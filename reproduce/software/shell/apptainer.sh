@@ -9,34 +9,35 @@
 #
 # Usage:
 #
-#   - When you are at the top Maneage'd project directory, you can run this
-#     script like the example below. Just set all the '/PATH/TO/...'
-#     directories. See the items below for optional values.
+#   - When you are at the top Maneage'd project directory, run this script
+#     like the example below. Just set the build directory location on your
+#     system. See the items below for optional values to optimize the
+#     process (avoid downloading for exmaple).
 #
-#          ./reproduce/software/containers/apptainer.sh \
-#                      --build-dir=/PATH/TO/BUILD/DIRECTORY \
-#                      --software-dir=/PATH/TO/SOFTWARE/TARBALLS
+#          ./reproduce/software/shell/apptainer.sh \
+#                      --build-dir=/PATH/TO/BUILD/DIRECTORY
 #
-#     - Non-mandatory options:
+#   - Non-mandatory options:
 #
-#         - If you already have the input data that is necessary for your
-#           project's, use the '--input-dir' option to specify its location
-#           on your host file system. Otherwise the necessary analysis
-#           files will be downloaded directly into the build
-#           directory. Note that this is only necessary when '--build-only'
-#           is not given.
+#       - If you already have the input data that is necessary for your
+#         project, use the '--input-dir' option to specify its location
+#         on your host file system. Otherwise the necessary analysis
+#         files will be downloaded directly into the build
+#         directory. Note that this is only necessary when '--build-only'
+#         is not given.
 #
-#         - The '--software-dir' is only useful if you want to build a
-#           container. Even in that case, it is not mandatory: if not
-#           given, the software tarballs will be downloaded (thus requiring
-#           internet).
+#       - If you already have the necessary software tarballs that are
+#         necessary for your project, use the '--software-dir' option to
+#         specify its location on your host file system only when
+#         building the container. No problem if you don't have them, they
+#         will be downloaded during the configuration phase.
 #
-#     - To avoid having to set them every time you want to start the
-#       apptainer environment, you can put this command (with the proper
-#       directories) into a 'run.sh' script in the top Maneage'd project
-#       source directory and simply execute that. The special name 'run.sh'
-#       is in Maneage's '.gitignore', so it will not be included in your
-#       git history by mistake.
+#   - To avoid having to set them every time you want to start the
+#     apptainer environment, you can put this command (with the proper
+#     directories) into a 'run.sh' script in the top Maneage'd project
+#     source directory and simply execute that. The special name 'run.sh'
+#     is in Maneage's '.gitignore', so it will not be included in your
+#     git history by mistake.
 #
 # Known problems:
 #
@@ -70,7 +71,7 @@ set -e
 
 
 # Default option values
-jobs=
+jobs=0
 quiet=0
 source_dir=
 build_only=
@@ -105,7 +106,7 @@ Top-level script to build and run a Maneage'd project within Apptainer.
       --container-shell    Open the container shell.
 
  Operating mode:
-      --quiet              Do not print informative statements.
+  -q, --quiet              Do not print informative statements.
   -?, --help               Give this help list.
   -j, --jobs=INT           Number of threads to use in each phase.
       --build-only         Just build the container, don't run it.
@@ -166,8 +167,8 @@ do
   --container_shell=*)   on_off_option_error --container-shell;;
 
   # Operating mode
-  --quiet)               quiet=1;                                                                   shift;;
-  --quiet=*)             on_off_option_error --quiet;;
+  -q|--quiet)            quiet=1;                                                                   shift;;
+  -q*|--quiet=*)         on_off_option_error --quiet;;
   -j|--jobs)             jobs="$2";                                  check_v "$1" "$jobs";          shift;shift;;
   -j=*|--jobs=*)         jobs="${1#*=}";                             check_v "$1" "$jobs";          shift;;
   -j*)                   jobs=$(echo "$1" | sed -e's/-j//');         check_v "$1" "$jobs";          shift;;
@@ -245,26 +246,28 @@ if ! [ x"$input_dir" = x ]; then
 fi
 
 # If no '--jobs' has been specified, use the maximum available jobs to the
-# operating system.
-if [ x$jobs = x ]; then jobs=$(nproc); fi
+# operating system. Apptainer only works on GNU/Linux operating systems, so
+# there is no need to account for reading the number of threads on macOS.
+if [ x"$jobs" = x0 ]; then jobs=$(nproc); fi
+
+# Since the container is read-only and is run with the '--contain' option
+# (which makes an empty '/tmp'), we need to make a dedicated directory for
+# the container to be able to write to. This is necessary because some
+# software (Biber in particular on the default branch) need to write there!
+# See https://github.com/plk/biber/issues/494.  We'll keep the directory on
+# the host OS within the build directory, but as a hidden file (since it is
+# not necessary in other types of build and ultimately only contains
+# temporary files of programs that need it).
+toptmp=$build_dir/.apptainer-tmp-$(whoami)
+if ! [ -d $toptmp ]; then mkdir $toptmp; fi
+chmod -R +w $toptmp/ # Some software remove writing flags on /tmp files.
+if ! [ x"$( ls -A $toptmp )" = x ]; then rm -r "$toptmp"/*; fi
 
 # [APPTAINER-ONLY] Optional mounting option for the software directory.
 software_dir_mnt=""
 if ! [ x"$software_dir" = x ]; then
     software_dir_mnt="--mount type=bind,src=$software_dir,dst=/home/maneager/tarballs-software"
 fi
-
-# [APPTAINER-ONLY] Since the container is read-only and is run with the
-# '--contain' option (which makes an empty '/tmp'), we need to make a
-# dedicated directory for the container to be able to write to. This is
-# necessary because some software (Biber in particular on the default
-# branch) need to write there! See https://github.com/plk/biber/issues/494.
-# We'll keep the directory on the host OS within the build directory, but
-# as a hidden file (since it is not necessary in other types of build and
-# ultimately only contains temporary files of programs that need it).
-toptmp=$build_dir/.apptainer-tmp-$(whoami)
-if ! [ -d $toptmp ]; then mkdir $toptmp; fi
-rm -rf $toptmp/*               # So previous runs don't affect this run.
 
 
 
@@ -284,7 +287,8 @@ if [ -f $project_name ]; then
     fi
 else
 
-    # Build the basic definition, with just Debian and gcc/g++
+    # Build the basic definition, with just Debian-slim with minimal
+    # necessary tools.
     if [ -f $base_name ]; then
         if [ $quiet = 0 ]; then
             printf "$scriptname: info: base OS docker image ('$base_name') "
@@ -300,7 +304,7 @@ Bootstrap: docker
 From: $base_os
 
 %post
-  apt-get update && apt-get install -y gcc g++
+  apt-get update && apt-get install -y gcc g++ wget
 EOF
         # Build the base operating system container and delete the
         # temporary definition file.
@@ -321,6 +325,7 @@ EOF
     #     software tarball directory, they will all be symbolic links that
     #     aren't valid when the user runs the container (since we only
     #     mount the software tarballs at build time).
+    intbuild=/home/maneager/build
     maneage_def=$build_dir/maneage.def
     cat <<EOF > $maneage_def
 Bootstrap: localimage
@@ -336,24 +341,34 @@ From: $base_name
   cd /home/maneager/source
   ./project configure --jobs=$jobs \\
                       --input-dir=/home/maneager/input \\
-                      --build-dir=/home/maneager/build \\
+                      --build-dir=$intbuild \\
                       --software-dir=/home/maneager/tarballs-software
   rm /home/maneager/build/software/tarballs/*
 
 %runscript
   cd /home/maneager/source
-  if   [ x"\$maneage_apptainer_stat" = xshell ]; then \\
-     ./project shell; \\
-  elif [ x"\$maneage_apptainer_stat" = xrun   ]; then \\
-     if [ x"\$maneage_jobs" = x ]; then \\
-       ./project make; \\
+  if ./project configure --build-dir=$intbuild \\
+                         --existing-conf --no-pause \\
+                         --offline --quiet; then \\
+     if   [ x"\$maneage_apptainer_stat" = xshell ]; then \\
+        ./project shell --build-dir=$intbuild; \\
+     elif [ x"\$maneage_apptainer_stat" = xrun   ]; then \\
+        if [ x"\$maneage_jobs" = x ]; then \\
+          ./project make --build-dir=$intbuild; \\
+        else \\
+          ./project make --build-dir=$intbuild --jobs=\$maneage_jobs; \\
+        fi; \\
      else \\
-       ./project make --jobs=\$maneage_jobs; \\
+        printf "$scriptname: '\$maneage_apptainer_stat' (value "; \\
+        printf "to 'maneage_apptainer_stat' environment variable) "; \\
+        printf "is not recognized: should be either 'shell' or 'run'"; \\
+        exit 1; \\
      fi; \\
   else \\
-     printf "$scriptname: '\$maneage_apptainer_stat' (value "; \\
-     printf "to 'maneage_apptainer_stat' environment variable) "; \\
-     printf "is not recognized: should be either 'shell' or 'run'"; \\
+     printf "$scriptname: configuration failed! This is probably "; \\
+     printf "due to a mismatch between the software versions of "; \\
+     printf "the container and the source that it is being "; \\
+     printf "executed.\n"; \\
      exit 1; \\
   fi
 EOF

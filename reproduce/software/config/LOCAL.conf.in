@@ -9,12 +9,30 @@
 # permitted in any medium without royalty provided the copyright notice and
 # this notice are preserved.  This file is offered as-is, without any
 # warranty.
-BDIR             = @bdir@
-INDIR            = @indir@
+
+
+
+
+# Local system settings
+# ---------------------
+#
+# Build directory (mandatory). All the created files of the project will be
+# within this directory.
+BDIR = @bdir@
+
+# Input data directory. This can be empty or a non-existant location. If
+# so, then the inputs will be downloaded from the 'INPUTS.conf' into the
+# build directory.
+INDIR = @indir@
+
+# Software source code directory. This can be empty or a non-existant
+# location. If so, the software tarballs will be downloaded.
 DEPENDENCIES-DIR = @ddir@
-SYS_CPATH        = @sys_cpath@
-DOWNLOADER       = @downloader@
-GROUP-NAME       = @groupname@
+
+# Other local settings (compiler, downloader and user).
+SYS_CPATH  = @sys_cpath@
+DOWNLOADER = @downloader@
+GROUP-NAME = @groupname@
 
 
 

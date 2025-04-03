@@ -9,35 +9,35 @@
 #
 # Usage:
 #
-#   - When you are at the top Maneage'd project directory, you can run this
-#     script like the example below. Just set all the '/PATH/TO/...'
-#     directories (see below for '--tmp-dir'). See the items below for
-#     optional values.
+#   - When you are at the top Maneage'd project directory, run this script
+#     like the example below. Just set the build directory location on your
+#     system. See the items below for optional values to optimize the
+#     process (avoid downloading for exmaple).
 #
-#          ./reproduce/software/containers/docker.sh --shm-size=15gb \
-#                      --software-dir=/PATH/TO/SOFTWARE/TARBALLS \
-#                      --build-dir=/PATH/TO/BUILD/DIRECTORY
+#        ./reproduce/software/shell/docker.sh --shm-size=20gb \
+#                    --build-dir=/PATH/TO/BUILD/DIRECTORY
 #
-#     - Non-mandatory options:
+#   - Non-mandatory options:
 #
-#         - If you already have the input data that is necessary for your
-#           project's, use the '--input-dir' option to specify its location
-#           on your host file system. Otherwise the necessary analysis
-#           files will be downloaded directly into the build
-#           directory. Note that this is only necessary when '--build-only'
-#           is not given.
+#       - If you already have the input data that is necessary for your
+#         project, use the '--input-dir' option to specify its location
+#         on your host file system. Otherwise the necessary analysis
+#         files will be downloaded directly into the build
+#         directory. Note that this is only necessary when '--build-only'
+#         is not given.
 #
-#         - The '--software-dir' is only useful if you want to build a
-#           container. Even in that case, it is not mandatory: if not
-#           given, the software tarballs will be downloaded (thus requiring
-#           internet).
+#       - If you already have the necessary software tarballs that are
+#         necessary for your project, use the '--software-dir' option to
+#         specify its location on your host file system only when
+#         building the container. No problem if you don't have them, they
+#         will be downloaded during the configuration phase.
 #
-#     - To avoid having to set the directory(s) every time you want to
-#       start the docker environment, you can put this command (with the
-#       proper directories) into a 'run.sh' script in the top Maneage'd
-#       project source directory and simply execute that. The special name
-#       'run.sh' is in Maneage's '.gitignore', so it will not be included
-#       in your git history by mistake.
+#   - To avoid having to set them every time you want to start the
+#     apptainer environment, you can put this command (with the proper
+#     directories) into a 'run.sh' script in the top Maneage'd project
+#     source directory and simply execute that. The special name 'run.sh'
+#     is in Maneage's '.gitignore', so it will not be included in your
+#     git history by mistake.
 #
 # Known problems:
 #
@@ -76,7 +76,7 @@ set -e
 
 
 # Default option values
-jobs=
+jobs=0
 quiet=0
 source_dir=
 build_only=
@@ -116,7 +116,7 @@ Top-level script to build and run a Maneage'd project within Docker.
       --container-shell    Open the container shell.
 
  Operating mode:
-      --quiet              Do not print informative statements.
+  -q, --quiet              Do not print informative statements.
   -?, --help               Give this help list.
       --shm-size=STR       Passed to 'docker build' (default: $shm_size).
   -j, --jobs=INT           Number of threads to use in each phase.
@@ -168,6 +168,8 @@ do
   # Container options.
   --base-name)           base_name="$2";                              check_v "$1" "$base_name";    shift;shift;;
   --base-name=*)         base_name="${1#*=}";                         check_v "$1" "$base_name";    shift;;
+  --project-name)        project_name="$2";                           check_v "$1" "$project_name"; shift;shift;;
+  --project-name=*)      project_name="${1#*=}";                      check_v "$1" "$project_name"; shift;;
 
   # Interactive shell.
   --project-shell)       project_shell=1;                                                           shift;;
@@ -176,8 +178,8 @@ do
   --container_shell=*)   on_off_option_error --container-shell;;
 
   # Operating mode
-  --quiet)               quiet=1;                                                                   shift;;
-  --quiet=*)             on_off_option_error --quiet;;
+  -q|--quiet)            quiet=1;                                                                   shift;;
+  -q*|--quiet=*)         on_off_option_error --quiet;;
   -j|--jobs)             jobs="$2";                                  check_v "$1" "$jobs";          shift;shift;;
   -j=*|--jobs=*)         jobs="${1#*=}";                             check_v "$1" "$jobs";          shift;;
   -j*)                   jobs=$(echo "$1" | sed -e's/-j//');         check_v "$1" "$jobs";          shift;;
@@ -250,17 +252,43 @@ if ! [ x"$input_dir" = x ]; then
     input_dir_mnt="-v $input_dir:/home/maneager/input"
 fi
 
-# If no '--jobs' has been specified, use the maximum available jobs to the
-# operating system.
-if [ x$jobs = x ]; then jobs=$(nproc); fi
+# Number of threads to build software (taken from 'configure.sh').
+if [ x"$jobs" = x0 ]; then
+    if type nproc > /dev/null 2> /dev/null; then
+        numthreads=$(nproc --all);
+    else
+        numthreads=$(sysctl -a | awk '/^hw\.ncpu/{print $2}')
+        if [ x"$numthreads" = x ]; then numthreads=1; fi
+    fi
+else
+    numthreads=$jobs
+fi
 
-# [DOCKER-ONLY] Make sure the user is a member of the 'docker' group:
-glist=$(groups $(whoami) | awk '/docker/')
-if [ x"$glist" = x ]; then
-    printf "$scriptname: you are not a member of the 'docker' group "
-    printf "You can run the following command as root to fix this: "
-    printf "'usermod -aG docker $(whoami)'\n"
-    exit 1
+# Since the container is read-only and is run with the '--contain' option
+# (which makes an empty '/tmp'), we need to make a dedicated directory for
+# the container to be able to write to. This is necessary because some
+# software (Biber in particular on the default branch or Ghostscript) need
+# to write there! See https://github.com/plk/biber/issues/494. We'll keep
+# the directory on the host OS within the build directory, but as a hidden
+# file (since it is not necessary in other types of build and ultimately
+# only contains temporary files of programs that need it).
+toptmp=$build_dir/.docker-tmp-$(whoami)
+if ! [ -d $toptmp ]; then mkdir $toptmp; fi
+chmod -R +w $toptmp/ # Some software remove writing flags on /tmp files.
+if ! [ x"$( ls -A $toptmp )" = x ]; then rm -r "$toptmp"/*; fi
+
+# [DOCKER-ONLY] Make sure the user is a member of the 'docker' group. This
+# is needed only for Linux, given that other systems uses other strategies.
+# (See: https://stackoverflow.com/a/70385997)
+kernelname=$(uname -s)
+if [ x$kernelname = xLinux ]; then
+    glist=$(groups $(whoami) | awk '/docker/')
+    if [ x"$glist" = x ]; then
+        printf "$scriptname: you are not a member of the 'docker' group "
+        printf "You can run the following command as root to fix this: "
+        printf "'usermod -aG docker $(whoami)'\n"
+        exit 1
+    fi
 fi
 
 # [DOCKER-ONLY] Function to check the temporary directory for building the
@@ -341,6 +369,7 @@ fi
 #
 # Having the base operating system in place, we can now construct the
 # project's docker file.
+intbuild=/home/maneager/build
 if docker image list | grep $project_name &> /dev/null; then
     if [ $quiet = 0 ]; then
         printf "$scriptname: info: project's image ('$project_name') "
@@ -387,7 +416,7 @@ else
     printf "    cp -r $dsr /home/maneager/source; \x5C\n"          >> $df
     printf "    cd /home/maneager/source; \x5C\n"                  >> $df
     printf "    ./project configure --jobs=$jobs \x5C\n"           >> $df
-    printf "              --build-dir=/home/maneager/build \x5C\n" >> $df
+    printf "              --build-dir=$intbuild \x5C\n"            >> $df
     printf "              --input-dir=/home/maneager/input \x5C\n" >> $df
     printf "              --software-dir=$dts; \x5C\n"             >> $df
 
@@ -456,29 +485,33 @@ fi
 # The startup command of the container is managed though the 'shellopt'
 # variable that starts here.
 shellopt=""
+sobase="/bin/bash -c 'cd source; "
+sobase="$sobase ./project configure --build-dir=$intbuild "
+sobase="$sobase --existing-conf --no-pause --offline --quiet && "
+sobase="$sobase ./project MODE --build-dir=$intbuild"
 if [ $container_shell = 1 ] || [ $project_shell = 1 ]; then
 
-    # If the user wants to start the project shell within the container,
-    # add the necessary command.
-    if [ $project_shell = 1 ]; then
-        shellopt="/bin/bash -c 'cd source; ./project shell;'"
-    fi
-
-    # Finish the 'shellop' string with a single quote (necessary in any
-    # case) and run Docker.
+    # The interactive flag is necessary for both these scenarios.
     interactiveopt="-it"
+
+    # With '--project-shell' we need 'shellopt', the MODE just needs to be
+    # set to 'shell'.
+    if [ $project_shell = 1 ]; then
+        shellopt="$(echo $sobase | sed -e's|MODE|shell|');'"
+    fi
 
 # No interactive shell requested, just run the project.
 else
     interactiveopt=""
-    shellopt="/bin/bash -c 'cd source; ./project make --jobs=$jobs;'"
+    shellopt="$(echo $sobase | sed -e's|MODE|make|') --jobs=$jobs;'"
 fi
 
 # Execute Docker. The 'eval' is because the 'shellopt' variable contains a
 # single-quote that the shell should "evaluate".
-eval docker run \
+eval docker run --read-only \
             -v "$analysis_dir":/home/maneager/build/analysis \
             -v "$source_dir":/home/maneager/source \
+            -v $toptmp:/tmp \
             $input_dir_mnt \
             $shm_mnt \
             $interactiveopt \

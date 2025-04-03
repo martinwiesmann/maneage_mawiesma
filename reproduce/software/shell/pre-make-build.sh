@@ -135,16 +135,6 @@ download_tarball() {
     else mv "$ucname" "$maneagetar"
     fi
   fi
-
-  # If the tarball is newer than the (possibly existing) program (the
-  # version has changed), then delete the program. When the LaTeX name is
-  # not given here, the software is re-built later (close to the end of
-  # 'basic.mk') and the name is properly placed there.
-  if [ -f "$ibidir/$progname" ]; then
-      if [ "$maneagetar" -nt "$ibidir/$progname" ]; then
-          rm "$ibidir/$progname"
-      fi
-  fi
 }
 
 
@@ -158,6 +148,9 @@ build_program() {
 
     # Options
     configoptions=$1
+
+    # Inform the user.
+    echo; echo "Pre-make building of $progname"; echo
 
     # Go into the temporary building directory.
     cd "$tmpblddir"
@@ -183,7 +176,8 @@ build_program() {
 
     # build the project, either with Make and either without it.
     if [ x$progname = xlzip ]; then
-        ./configure --build --check --installdir="$instdir/bin" $configoptions
+        ./configure --build --check --installdir="$instdir/bin" \
+                    $configoptions
     else
         # All others accept the configure script.
         ./configure --prefix="$instdir" $configoptions
@@ -196,7 +190,10 @@ build_program() {
             case $on_mac_os in
                 yes) sed -e's/\%1u/\%d/'  src/flock.c > src/flock-new.c;;
                 no)  sed -e's/\%1u/\%ld/' src/flock.c > src/flock-new.c;;
-                *)   echo "pre-make-build.sh: '$on_mac_os' unrecognized value for on_mac_os";;
+                *)
+                    printf "pre-make-build.sh: '$on_mac_os' "
+                    printf "unrecognized value for on_mac_os"
+                    exit 1;;
             esac
             mv src/flock-new.c src/flock.c
         fi
@@ -218,9 +215,9 @@ build_program() {
     cd "$topdir"
     rm -rf "$tmpblddir/$unpackdir"
     if [ x"$progname_tex" = x ]; then
-        echo "" > "$ibidir/$progname"
+        echo "" > "$texfile"
     else
-        echo "$progname_tex $version" > "$ibidir/$progname"
+        echo "$progname_tex $version" > "$texfile"
     fi
   fi
 }
@@ -238,12 +235,12 @@ build_program() {
 # (without compression it is just ~400Kb). So we use its '.tar' file and
 # won't rely on the host's compression tools at all.
 progname="lzip"
-progname_tex="" # Lzip re-built after GCC (empty string to avoid repetition)
+progname_tex="" # Lzip is re-built after GCC (empty to avoid repetition)
 url=$(awk '/^'$progname'-url/{print $3}' $urlfile)
 version=$(awk '/^'$progname'-version/{print $3}' "$versionsfile")
 tarball=$progname-$version.tar
-download_tarball
-build_program
+texfile="$ibidir/$progname-$version-pre-make"
+if ! [ -f $texfile ]; then download_tarball; build_program; fi
 
 
 
@@ -268,8 +265,11 @@ progname_tex="" # Make re-built after GCC (empty string to avoid repetition)
 url=$(awk '/^'$progname'-url/{print $3}' $urlfile)
 version=$(awk '/^'$progname'-version/{print $3}' $versionsfile)
 tarball=$progname-$version.tar.lz
-download_tarball
-build_program "--disable-dependency-tracking --without-guile"
+texfile="$ibidir/$progname-$version-pre-make"
+if ! [ -f $texfile ]; then
+    download_tarball
+    build_program "--disable-dependency-tracking --without-guile"
+fi
 
 
 
@@ -286,13 +286,11 @@ progname_tex="Dash"
 url=$(awk '/^'$progname'-url/{print $3}' $urlfile)
 version=$(awk '/^'$progname'-version/{print $3}' $versionsfile)
 tarball=$progname-$version.tar.lz
-download_tarball
-build_program
+texfile="$ibidir/$progname-$version"
+if ! [ -f $texfile ]; then download_tarball; build_program; fi
 
 # If the 'sh' symbolic link isn't set yet, set it to point to Dash.
-if [ -f $bindir/sh ]; then just_a_place_holder=1
-else ln -sf $bindir/dash $bindir/sh;
-fi
+if ! [ -f $bindir/sh ]; then ln -sf $bindir/dash $bindir/sh; fi
 
 
 
@@ -315,12 +313,5 @@ progname_tex="Discoteq flock"
 url=$(awk '/^'$progname'-url/{print $3}' $urlfile)
 version=$(awk '/^'$progname'-version/{print $3}' $versionsfile)
 tarball=$progname-$version.tar.lz
-download_tarball
-build_program
-
-
-
-
-
-# Finish this script successfully
-exit 0
+texfile="$ibidir/$progname-$version"
+if ! [ -f $texfile ]; then download_tarball; build_program; fi

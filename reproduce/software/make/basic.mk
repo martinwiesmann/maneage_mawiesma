@@ -39,7 +39,7 @@
 # along with this Makefile.  If not, see <http://www.gnu.org/licenses/>.
 
 # Top level environment
-include reproduce/software/config/LOCAL.conf
+include .build/software/config/LOCAL.conf
 include reproduce/software/make/build-rules.mk
 include reproduce/software/config/versions.conf
 include reproduce/software/config/checksums.conf
@@ -63,10 +63,13 @@ ibidir   = $(BDIR)/software/installed/version-info/proglib
 # editor) is installed by default, it is recommended to have it in the
 # 'basic.mk', so Maneaged projects can be edited on any system (even when
 # there is no command-line text editor available).
+#
+# The recipe is '@echo > /dev/null' so Make does not print "make: Nothing
+# to be done for 'all'."
 targets-proglib = low-level-links \
                   gcc-$(gcc-version) \
                   nano-$(nano-version)
-all: $(foreach p, $(targets-proglib), $(ibidir)/$(p))
+all: $(foreach p, $(targets-proglib), $(ibidir)/$(p)); @echo > /dev/null
 
 # Define the shell environment
 # ----------------------------
@@ -423,7 +426,7 @@ $(ibidir)/ncurses-$(ncurses-version): $(ibidir)/patchelf-$(patchelf-version)
 	rm -f $(ibdir)/bash* $(ibdir)/awk* $(ibdir)/gawk*
 
 #	Standard build process.
-	export CFLAGS="-std=c17 $$CFLAGS"
+	export CFLAGS="-std=gnu17 $$CFLAGS"
 	$(call gbuild, ncurses-$(ncurses-version), static, \
 	               --with-shared --enable-rpath --without-normal \
 	               --without-debug --with-cxx-binding \
@@ -562,7 +565,7 @@ $(ibidir)/bash-$(bash-version): \
 	if [ "x$(static_build)" = xyes ]; then stopt="--enable-static-link"
 	else                                   stopt=""
 	fi;
-	export CFLAGS="$$CFLAGS -std=c17 \
+	export CFLAGS="$$CFLAGS -std=gnu17 \
 	               -DDEFAULT_PATH_VALUE='\"$(ibdir)\"' \
 	               -DSTANDARD_UTILS_PATH='\"$(ibdir)\"'  \
 	               -DSYS_BASHRC='\"$(BASH_ENV)\"' "
@@ -1015,7 +1018,7 @@ $(ibidir)/gmp-$(gmp-version): \
               $(ibidir)/coreutils-$(coreutils-version)
 	tarball=gmp-$(gmp-version).tar.lz
 	$(call import-source, $(gmp-url), $(gmp-checksum))
-	export CFLAGS="-std=c17 $$CFLAGS"
+	export CFLAGS="-std=gnu17 $$CFLAGS"
 	$(call gbuild, gmp-$(gmp-version), static, \
 	               --enable-cxx --enable-fat, \
 	               -j$(numthreads))
@@ -1076,7 +1079,7 @@ $(ibidir)/grep-$(grep-version): $(ibidir)/coreutils-$(coreutils-version)
 $(ibidir)/m4-$(m4-version): $(ibidir)/patchelf-$(patchelf-version)
 	tarball=m4-$(m4-version).tar.lz
 	$(call import-source, $(m4-url), $(m4-checksum))
-	export CFLAGS="-std=c17 $$CFLAGS"
+	export CFLAGS="-std=gnu17 $$CFLAGS"
 	$(call gbuild, m4-$(m4-version), static, \
 	               --with-syscmd-shell=$(ibdir)/dash, \
 	               -j$(numthreads) V=1)
@@ -1109,7 +1112,7 @@ $(ibidir)/pkg-config-$(pkgconfig-version): $(ibidir)/patchelf-$(patchelf-version
 	if [ x$(on_mac_os) = xyes ]; then export compiler="CC=clang"
 	else                              export compiler=""
 	fi
-	export CFLAGS="-std=c17 $$CFLAGS"
+	export CFLAGS="-std=gnu17 $$CFLAGS"
 	$(call gbuild, pkg-config-$(pkgconfig-version), static, \
 	               $$compiler --with-internal-glib \
 	               --with-pc-path=$(ildir)/pkgconfig, V=1)

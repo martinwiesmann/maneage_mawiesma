@@ -105,8 +105,6 @@ else
 texbdir:=$(texdir)/build-$(shell whoami)
 endif
 tikzdir:=$(texbdir)/tikz
-$(texbdir):; mkdir $@
-$(tikzdir): | $(texbdir); mkdir $@
 
 
 
@@ -120,8 +118,8 @@ $(tikzdir): | $(texbdir); mkdir $@
 # on). Therefore, we should copy those macros here in the LaTeX build
 # directory, so the TeX directory is completely independent from each
 # other.
-$(mtexdir)/dependencies.tex: $(bsdir)/tex/dependencies.tex
-	cp $(bsdir)/tex/*.tex $(mtexdir)/
+$(mtexdir)/dependencies.tex: $(bsdir)/config/dependencies.tex
+	cp $(bsdir)/config/*.tex $(mtexdir)/
 
 
 
@@ -140,7 +138,7 @@ $(mtexdir)/dependencies.tex: $(bsdir)/tex/dependencies.tex
 # been modified, we don't want to re-build the bibliography, only the final
 # PDF.
 $(texbdir)/paper.bbl: tex/src/references.tex $(mtexdir)/dependencies.tex \
-                      | $(mtexdir)/project.tex $(tikzdir)
+                      | $(mtexdir)/project.tex
 
 #	If '$(mtexdir)/project.tex' is empty, don't build PDF.
 	@macros=$$(cat $(mtexdir)/project.tex)

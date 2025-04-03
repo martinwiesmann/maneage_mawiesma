@@ -332,25 +332,30 @@ disable internet after the configuration phase. Note that only the
 necessary TeXLive packages are installed (~350 MB), not the full TeXLive
 collection!
 
-The container technologies that Maneage has been tested on an documentation
-exists in this project (with the `reproduce/software/containers` directory)
-are listed below. See the respective `README-*.md` file in that directory
-for the details:
+The container technologies that Maneage has a high-level interface for
+(with the `reproduce/software/shell` directory) are listed below. Each has
+a dedicated shell script in that directory with an (almost) identical
+interface. See the respective `*-README.md` file in that directory for more
+details, as well as running your desired script with `--help` or reading
+its comments at the top of the file.
 
   - [Apptainer](https://apptainer.org): useful in high performance
     computing (HPC) facilities (where you do not have root
     permissions). Apptainer is fully free and open source software.
     Apptainer containers can only be created and used on GNU/Linux
-    operating systems, but are stored as files (easy to manage).
+    operating systems, but are stored as a single file (very easy to
+    manage).
 
   - [Docker](https://www.docker.com): requires root access, but useful on
     virtual private servers (VPSs). Docker images are stored and managed by
     a root-level daemon, so you can only manage them through its own
-    interface. A docker container build on a GNU/Linux host can also be
-    executed on Windows or macOS. However, while the Docker engine and its
-    command-line interface on GNU/Linux are free and open source software,
-    its desktop application (with a GUI and components necessary for
-    Windows or macOS) is not (requires payment for large companies).
+    interface (making containers by all users visible and accessible to all
+    other users of a system by default). A docker container build on a
+    GNU/Linux host can also be executed on Windows or macOS. However, while
+    the Docker engine and its command-line interface on GNU/Linux are free
+    and open source software, its desktop application (with a GUI and
+    components necessary for Windows or macOS) is not (requires payment for
+    large companies).
 
 
 

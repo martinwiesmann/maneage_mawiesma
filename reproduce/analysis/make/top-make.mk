@@ -19,9 +19,9 @@
 
 
 
-# Load the local configuration (created after running
-# './project configure').
-include reproduce/software/config/LOCAL.conf
+# Load the local configuration (created after running './project
+# configure').
+include .build/software/config/LOCAL.conf
 
 
 

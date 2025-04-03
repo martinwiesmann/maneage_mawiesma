@@ -33,6 +33,7 @@ set -e
 jobs=0     # 0 is for the default for the 'configure.sh' script.
 group=
 debug=
+quiet=0
 timing=0
 host_cc=0
 offline=
@@ -43,6 +44,7 @@ keep_going=
 check_config=
 make_targets=
 software_dir=
+pauseformsg=1
 clean_texdir=0
 prepare_redo=0
 highlightnew=0
@@ -107,16 +109,18 @@ Project 'make' special tagets
 
 With the options below you can modify the default behavior.
 Configure options:
+      --all-highlevel      Build all high-level software (for development).
   -b, --build-dir=STR      Top directory to build the project in.
-  -e, --existing-conf      Use (possibly existing) local configuration.
-      --host-cc            Use host system's C compiler, don't build GCC.
-  -i, --input-dir=STR      Directory containing input datasets (optional).
-  -s, --software-dir=STR   Directory containing necessary software tarballs.
       --check-config       During configuration, show what is being built.
       --clean-texdir       Remove possibly existing build-time subdirectories
                            under the project's 'tex/' directory (can happen
                            when source is from arXiv for example).
-      --all-highlevel      Build all high-level software (for development).
+  -e, --existing-conf      Use (possibly existing) local configuration.
+  -i, --input-dir=STR      Directory containing input datasets (optional).
+      --host-cc            Use host system's C compiler, don't build GCC.
+      --quiet              Do not print basic info messages (with '-e').
+      --no-pause           Do not sleep/pause after basic info messages.
+  -s, --software-dir=STR   Directory containing necessary software tarballs.
 
 Configure and Make options:
   -d, --debug[=FLAGS]      In configure: use -j1, no -k, and no Zenodo check.
@@ -180,67 +184,71 @@ do
   shell)        func_operation_set $1; shift;;
 
   # Configure options:
-  -b|--build-dir)        build_dir="$2";                                     check_v "$1" "$build_dir";    shift;shift;;
-  -b=*|--build-dir=*)    build_dir="${1#*=}";                                check_v "$1" "$build_dir";    shift;;
-  -b*)                   build_dir=$(echo    "$1" | sed -e's/-b//');         check_v "$1" "$build_dir";    shift;;
-  -e|--existing-conf)    existing_conf=1;                                                                  shift;;
+  -e|--existing-conf)    existing_conf=1;                                                          shift;;
   -e*|--existing-conf=*) on_off_option_error --existing-conf -e;;
-  --host-cc)             host_cc=1;                                                                        shift;;
+  --host-cc)             host_cc=1;                                                                shift;;
   --host-cc=*)           on_off_option_error --host-cc;;
-  --offline)             offline=1;                                                                        shift;;
+  --offline)             offline=1;                                                                shift;;
   --offline=*)           on_off_option_error --offline;;
-  -i|--input-dir)        input_dir="$2";                                     check_v "$1" "$input_dir";    shift;shift;;
-  -i=*|--input-dir=*)    input_dir="${1#*=}";                                check_v "$1" "$input_dir";    shift;;
-  -i*)                   input_dir=$(echo    "$1" | sed -e's/-i//');         check_v "$1" "$input_dir";    shift;;
-  -s|--software-dir)     software_dir="$2";                                  check_v "$1" "$software_dir"; shift;shift;;
-  -s=*|--software-dir=*) software_dir="${1#*=}";                             check_v "$1" "$software_dir"; shift;;
-  -s*)                   software_dir=$(echo "$1" | sed -e's/-s//');         check_v "$1" "$software_dir"; shift;;
-  --check-config)        check_config=1;                                                                   shift;;
+  -i|--input-dir)        input_dir="$2";                             check_v "$1" "$input_dir";    shift;shift;;
+  -i=*|--input-dir=*)    input_dir="${1#*=}";                        check_v "$1" "$input_dir";    shift;;
+  -i*)                   input_dir=$(echo    "$1" | sed -e's/-i//'); check_v "$1" "$input_dir";    shift;;
+  -s|--software-dir)     software_dir="$2";                          check_v "$1" "$software_dir"; shift;shift;;
+  -s=*|--software-dir=*) software_dir="${1#*=}";                     check_v "$1" "$software_dir"; shift;;
+  -s*)                   software_dir=$(echo "$1" | sed -e's/-s//'); check_v "$1" "$software_dir"; shift;;
+  --check-config)        check_config=1;                                                           shift;;
   --check-config=*)      on_off_option_error --check-config;;
-  --clean-texdir)        clean_texdir=1;                                                                   shift;;
+  --clean-texdir)        clean_texdir=1;                                                           shift;;
   --clean-texdir=*)      on_off_option_error --clean-texdir;;
-  --all-highlevel)       all_highlevel=1;                                                                  shift;;
+  --all-highlevel)       all_highlevel=1;                                                          shift;;
   --all-highlevel=*)     on_off_option_error --all-highlevel;;
+  --no-pause)            pauseformsg=0;                                                            shift;;
+  --no-pause=*)          on_off_option_error --no-pause;;
+  --quiet)               quiet=1;                                                                  shift;;
+  --quiet=*)             on_off_option_error --quiet;;
 
   # Configure and Make options:
-  -g|--group)             group="$2";                            check_v group "$group";   shift;shift;;
-  -g=*|--group=*)         group="${1#*=}";                       check_v group "$group";   shift;;
-  -g*)                    group=$(echo   "$1" | sed -e's/-g//'); check_v group "$group";   shift;;
-  -j|--jobs)              jobs="$2";                             check_v jobs  "$jobs";    shift;shift;;
-  -j=*|--jobs=*)          jobs="${1#*=}";                        check_v jobs  "$jobs";    shift;;
-  -j*)                    jobs=$(echo "$1" | sed -e's/-j//');    check_v jobs  "$jobs";    shift;;
-  -k|--keep-going)        keep_going="--keep-going";                                       shift;;
-  -k=*|--keep-going=*)    on_off_option_error --keep-going -k;;
-  -k*)                    on_off_option_error --keep-going -k;;
-  -'?'|--help)            print_help; exit 0;;
-  -'?'*|--help=*)         on_off_option_error --help -?;;
+  -b|--build-dir)        build_dir="$2";                             check_v "$1" "$build_dir";shift;shift;;
+  -b=*|--build-dir=*)    build_dir="${1#*=}";                        check_v "$1" "$build_dir";shift;;
+  -b*)                   build_dir=$(echo    "$1" | sed -e's/-b//'); check_v "$1" "$build_dir";shift;;
+  -g|--group)            group="$2";                                 check_v group "$group";   shift;shift;;
+  -g=*|--group=*)        group="${1#*=}";                            check_v group "$group";   shift;;
+  -g*)                   group=$(echo   "$1" | sed -e's/-g//');      check_v group "$group";   shift;;
+  -j|--jobs)             jobs="$2";                                  check_v jobs  "$jobs";    shift;shift;;
+  -j=*|--jobs=*)         jobs="${1#*=}";                             check_v jobs  "$jobs";    shift;;
+  -j*)                   jobs=$(echo "$1" | sed -e's/-j//');         check_v jobs  "$jobs";    shift;;
+  -k|--keep-going)       keep_going="--keep-going";                                            shift;;
+  -k=*|--keep-going=*)   on_off_option_error --keep-going -k;;
+  -k*)                   on_off_option_error --keep-going -k;;
+  -'?'|--help)           print_help; exit 0;;
+  -'?'*|--help=*)        on_off_option_error --help -?;;
 
   # Make options (analysis):
-  -p|--prepare-redo)      prepare_redo=1;                                                  shift;;
-  -p=*|--prepare-redo=*)  on_off_option_error --prepare-redo;                              shift;;
-  -t|--timing)            timing=1;                                                        shift;;
-  -t=*|--timing=*)        on_off_option_error --timing;                                    shift;;
+  -p|--prepare-redo)     prepare_redo=1;                                                  shift;;
+  -p=*|--prepare-redo=*) on_off_option_error --prepare-redo;                              shift;;
+  -t|--timing)           timing=1;                                                        shift;;
+  -t=*|--timing=*)       on_off_option_error --timing;                                    shift;;
 
   # Make options (final PDF):
-  --refresh-bib)          [ -f tex/src/references.tex ] && touch tex/src/references.tex;   shift;;
-  --highlight-all)        highlightnew=1; highlightnotes=1;                                shift;;
-  --highlight-all=*)      on_off_option_error --highlight-new;;
-  --highlight-new)        highlightnew=1;                                                  shift;;
-  --highlight-new=*)      on_off_option_error --highlight-new;;
-  --highlight-notes)      highlightnotes=1;                                                shift;;
-  --highlight-notes=*)    on_off_option_error --highlight-notes;;
-  -d|--debug)             if [ x$operation = x ]; then
-                              echo "Please set the operation before calling '--debug'"; exit 1
-                          elif [ x$operation = xconfigure ]; then debug=a;   shift;
-                          elif [ x$operation = xmake ]; then
-                              if [ x"$2" = x ]; then
-                                  echo "In make-mode, '--debug' needs a value; see GNU Make manual"; exit 1
-                              else debug="$2"; check_v debug "$debug"; shift;shift; fi
-                          else
-                              echo "Operation '$operation' not recognized, please use 'configure' or 'make'"
-                          fi;;
-  -d=*|--debug=*)         debug="${1#*=}";                       check_v debug "$debug";   shift;;
-  -d*)                    debug=$(echo "$1" | sed -e's/-d//');   check_v debug "$debug";   shift;;
+  --refresh-bib)         [ -f tex/src/references.tex ] && touch tex/src/references.tex;   shift;;
+  --highlight-all)       highlightnew=1; highlightnotes=1;                                shift;;
+  --highlight-all=*)     on_off_option_error --highlight-new;;
+  --highlight-new)       highlightnew=1;                                                  shift;;
+  --highlight-new=*)     on_off_option_error --highlight-new;;
+  --highlight-notes)     highlightnotes=1;                                                shift;;
+  --highlight-notes=*)   on_off_option_error --highlight-notes;;
+  -d|--debug)            if [ x$operation = x ]; then
+                             echo "Please set the operation before calling '--debug'"; exit 1
+                         elif [ x$operation = xconfigure ]; then debug=a;   shift;
+                         elif [ x$operation = xmake ]; then
+                             if [ x"$2" = x ]; then
+                                 echo "In make-mode, '--debug' needs a value; see GNU Make manual"; exit 1
+                             else debug="$2"; check_v debug "$debug"; shift;shift; fi
+                         else
+                             echo "Operation '$operation' not recognized, please use 'configure' or 'make'"
+                         fi;;
+  -d=*|--debug=*)        debug="${1#*=}";                       check_v debug "$debug";   shift;;
+  -d*)                   debug=$(echo "$1" | sed -e's/-d//');   check_v debug "$debug";   shift;;
 
   # Unrecognized option:
   -*) echo "$scriptname: unknown option '$1'"; exit 1;;
@@ -294,8 +302,8 @@ EOF
                 ls $coloropt .build/software/build-tmp || junk=1;
             fi
 
-            # Make the temporary directory, delete its contents, then put new
-            # links of all built software.
+            # Make the temporary directory, delete its contents, then put
+            # new links of all built software.
             if ! [ -d $checkdir ]; then mkdir $checkdir; fi
             rm -f $checkdir/*
 
@@ -316,10 +324,11 @@ EOF
             if [ $printresults = 1 ]; then
                 echo "--- Last 5 packages that were built:"
 
-                # Then sort all the links based on the most recent dates of the
-                # files they link to (with '-L').
+                # Then sort all the links based on the most recent dates of
+                # the files they link to (with '-L').
                 ls -Llt $checkdir  \
-                    | awk '/^-/ && c++<5 {printf "[at %s] %s\n", $(NF-1), $NF}'
+                    | awk '/^-/ && c++<5 {printf "[at %s] %s\n", \
+                                                 $(NF-1), $NF}'
             fi
         else
             cat <<EOF
@@ -343,14 +352,15 @@ fi
 
 
 
-# Basic group settings
-# --------------------
+# Group check
+# -----------
 if ! [ x$group = x ]; then
 
     # Check if group is usable.
     if ! sg "$group" "echo Group \'$group\' exists"; then
-        echo "$scriptname: '$group' is not a usable group name on this system.";
-        echo "(TIP: you can use the 'groups' command to see your groups)"
+        printf "$scriptname: '$group' is not a usable group name on "
+        printf "this system. TIP: you can use the 'groups' command "
+        printf "to see your groups)\n"
         exit 1
     fi
 
@@ -362,9 +372,45 @@ fi
 
 
 
-# Error when configuration isn't run
-configuration_necessary() {
-    cat <<EOF
+# Build directory symbolic links
+# ------------------------------
+#
+# The source directory will contain two symbolic links that point to the
+# build directory:
+
+#   - .build: the top build directory.
+#
+#   - .local: the second to the top software installed directory. They are
+#     used during the configuration phase to simplify commands and are also
+#     very useful during the development of a maneage'd project (to easily
+#     get to the build directory or execut Maneage'd software).
+#
+# This needs to be done on every run because:
+#   - './project configure' can be run with a new build directory, and
+#     keeping the old '.build' conflicts with the new build directory
+#     that the user gave.
+#   - './project make' or './project shell' (within a newly cloned source
+#     directory from inside a container): the links do not exist but have
+#     to be set to the container's build directory.
+#   - This is not an expensive operation.
+if ! [ x"$build_dir" = x ]; then
+    rm -f .build .local
+    ln -s $build_dir .build
+    ln -s $build_dir/software/installed .local
+fi
+
+
+
+
+
+# Function to validate configuration
+# ----------------------------------
+#
+# Check if the configuration is missing/incomplete
+configuration_check() {
+    confdone=software/config/hardware-parameters.tex
+    if ! [ -f .build/$confdone ]; then
+        cat <<EOF
 
 The project is either (1) not configured on this system, or (2) the
 configuration wasn't successful.
@@ -384,15 +430,69 @@ If there was a problem, please let us know by filling this online form:
       http://savannah.nongnu.org/support/?func=additem&group=reproduce
 
 EOF
-    exit 1
+        exit 1
+    fi
 }
 
 
 
 
 
-# Run operations in controlled environment
-# ----------------------------------------
+# Function for TeX Preparations
+# -----------------------------
+#
+# Make sure that the necessary analysis directories directory exist in the
+# build directory. These will be necessary in various phases of hte
+# analysis and having them inside the lower-level Make steps will require
+# setting them as prerequisites for many basic jobs (thus making the
+# Makefiles harder to read and add potentials for bugs: forgetting to add
+# them for example). Also, we don't want the configure phase to make any
+# edits in the analysis directory, so they are not built there.
+tex_preparations () {
+
+    # Extract the location of the build directory.
+    bdir=$(.local/bin/realpath .build)
+
+    # We are using our custom-built 'mkdir' which is guaranteed to have the
+    # '-p' option (that will also build intermediate directories) and won't
+    # complain if the directory already exists.
+    badir=$bdir/analysis
+    texdir=$badir/tex
+    btexdir=$texdir/build
+    tikzdir=$btexdir/tikz
+    mtexdir=$texdir/macros
+    .local/bin/mkdir -p $mtexdir $btexdir $tikzdir
+
+    # If 'tex/build' and 'tex/tikz' are symbolic links then 'rm -f'
+    # will delete them and we can continue. However, when the project
+    # is being built from the tarball (from arXiv for example), these
+    # two are not symbolic links but actual directories with the
+    # necessary built-components to build the PDF in them. In this
+    # case, because 'tex/build' is a directory, 'rm -f' will fail, so
+    # we'll just rename the two directories (as backup) and let the
+    # project build the proper symbolic links afterwards.
+    if rm -f tex/build; then
+        rm -f tex/tikz
+    else
+        mv tex/tikz  tex/tikz-from-tarball
+        mv tex/build tex/build-from-tarball
+    fi
+
+    # Build the symbolic links.
+    if ! [ -L tex/tikz ]; then ln -s "$tikzdir" tex/tikz; fi
+    if ! [ -L tex/build ]; then ln -s "$texdir" tex/build; fi
+}
+
+
+
+
+
+# Function to run in controlled environment
+# -----------------------------------------
+#
+# Controlling the environment is necessary for running the analysis. Like
+# the other funcitons here, this is defined to simplify the high-level code
+# within the 'make)' switch statement.
 perms="u+r,u+w,g+r,g+w,o-r,o-w,o-x"
 controlled_env() {
 
@@ -464,11 +564,13 @@ case $operation in
         # Variables to pass to the configuration script.
         export jobs=$jobs
         export debug=$debug
+        export quiet=$quiet
         export host_cc=$host_cc
         export offline=$offline
         export build_dir=$build_dir
         export input_dir=$input_dir
         export scriptname=$scriptname
+        export pauseformsg=$pauseformsg
         export maneage_group_name=$group
         export software_dir=$software_dir
         export existing_conf=$existing_conf
@@ -488,7 +590,8 @@ case $operation in
             # creates problems when another group member wants to update
             # the software for example. We thus need to manually add the
             # group writing flag to all installed software files.
-            echo "Enabling group writing permission on all installed software..."
+            printf "Enabling group writing permission on all installed "
+            printf "software...\n"
             .local/bin/chmod -R g+w .local/;
         fi
         ;;
@@ -500,43 +603,14 @@ case $operation in
     # Batch execution of the project.
     make)
 
-        # Make sure the configure script has been completed properly
-        # ('configuration-done.txt' exists).
-        if ! [ -f .build/software/configuration-done.txt ]; then
-            configuration_necessary
-        fi
+        # Make sure the configure script is complete and necessary LaTeX
+        # directories are in place.
+        configuration_check
+        tex_preparations
 
-        # Make sure that the necessary analysis directories directory exist
-        # in the build directory. These will be necessary in various phases
-        # of hte analysis and having them inside the lower-level Make steps
-        # will require setting them as prerequisites for many basic jobs
-        # (thus making the Makefiles harder to read and add potentials for
-        # bugs: forgetting to add them for example). Also, we don't want
-        # the configure phase to make any edits in the analysis directory,
-        # so they are not built there.
-        badir=.build/analysis
-        texdir=$badir/tex
-        mtexdir=$texdir/macros
-        if ! [ -d $badir   ]; then mkdir $badir;   fi
-        if ! [ -d $texdir  ]; then mkdir $texdir;  fi
-        if ! [ -d $mtexdir ]; then mkdir $mtexdir; fi
-
-        # TeX build directory. If built in a group scenario, the TeX build
-        # directory must be separate for each member (so they can work on their
-        # relevant parts of the paper without conflicting with each other).
-        if [ "x$maneage_group_name" = x ]; then
-            texbdir="$texdir"/build
-        else
-            user=$(whoami)
-            texbdir="$texdir"/build-$user
-        fi
-        tikzdir="$texbdir"/tikz
-        if ! [ -L tex/build ]; then ln -s "$(pwd -P)/$texdir" tex/build;  fi
-        if ! [ -L tex/tikz  ]; then ln -s "$(pwd -P)/$tikzdir" tex/tikz;  fi
-
-        # Register the start of this run (we are appending the new
-        # information so previous information is preserved until the user
-        # intentionally deletes/cleans it).
+        # Register the start of this run if requested (we are appending the
+        # new information so previous information is preserved until the
+        # user intentionally deletes/cleans it).
         if [ $timing = 1 ]; then echo "start: $(date)" >> timing.txt; fi
 
         # Run data preparation phase (optionally build Makefiles with
@@ -564,36 +638,33 @@ case $operation in
     # Interactive shell of Maneage.
     shell)
 
-        # Make sure the configure script has been completed properly
-        # ('configuration-done.txt' exists).
-        if ! [ -f .build/software/configuration-done.txt ]; then
-            configuration_necessary
-        fi
+        # Make sure the configure script has been completed properly.
+        configuration_check
 
         # Run the project's own shell without inheriting any environment
         # from the host. The 'TERM' environment variable is necessary for
         # tools like some text editors.
-        bdir=`.local/bin/realpath .build`
+        bdir=$(.local/bin/realpath .build)
         instdir="$bdir"/software/installed
         bindir="$bdir"/software/installed/bin
         rcfile=$(pwd)/reproduce/software/shell/bashrc.sh
         .local/bin/env -i \
-                       HOME="$bdir" \
-                       TERM="$TERM" \
-                       PATH="$bindir" \
-                       CCACHE_DISABLE=1 \
-                       PROJECT_STATUS=shell \
-                       SHELL="$bindir"/bash \
-                       COLORTERM="$COLORTERM" \
-                       PROJECT_RCFILE="$rcfile" \
-                       LDFLAGS=-L"$instdir"/lib \
-                       CPPFLAGS=-I"$instdir"/include \
-                       LD_LIBRARY_PATH="$instdir"/lib \
-                       OMPI_MCA_plm_rsh_agent=/bin/false \
-                       PYTHONPATH="$instdir"/lib/python/site-packages \
-                       PYTHONPATH3="$instdir"/lib/python/site-packages \
-                       PS1="[\[\033[01;35m\]maneage@\h \W\[\033[32m\]\[\033[00m\]]$ " \
-                       "$bindir"/bash --noprofile --rcfile "$rcfile"
+            HOME="$bdir" \
+            TERM="$TERM" \
+            PATH="$bindir" \
+            CCACHE_DISABLE=1 \
+            PROJECT_STATUS=shell \
+            SHELL="$bindir"/bash \
+            COLORTERM="$COLORTERM" \
+            PROJECT_RCFILE="$rcfile" \
+            LDFLAGS=-L"$instdir"/lib \
+            CPPFLAGS=-I"$instdir"/include \
+            LD_LIBRARY_PATH="$instdir"/lib \
+            OMPI_MCA_plm_rsh_agent=/bin/false \
+            PYTHONPATH="$instdir"/lib/python/site-packages \
+            PYTHONPATH3="$instdir"/lib/python/site-packages \
+            PS1="[\[\033[01;35m\]maneage@\h \W\[\033[32m\]\[\033[00m\]]$ " \
+            "$bindir"/bash --noprofile --rcfile "$rcfile"
         ;;
 
 

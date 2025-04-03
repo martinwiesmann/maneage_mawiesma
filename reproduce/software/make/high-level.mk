@@ -29,7 +29,7 @@
 # along with this Makefile.  If not, see <http://www.gnu.org/licenses/>.
 
 # Top level environment (same as 'basic.mk')
-include reproduce/software/config/LOCAL.conf
+include .build/software/config/LOCAL.conf
 include reproduce/software/make/build-rules.mk
 include reproduce/software/config/versions.conf
 include reproduce/software/config/checksums.conf
@@ -123,11 +123,12 @@ ifneq ($(strip $(offline)),1)
   target-texlive := $(itidir)/texlive
 endif
 
-# Ultimate Makefile target.
+# Ultimate Makefile target. The recipe is '@echo > /dev/null' so Make does
+# not print "make: Nothing to be done for 'all'."
 all: $(foreach p, $(targets-proglib), $(ibidir)/$(p)) \
      $(foreach p, $(targets-python), $(ipydir)/$(p)) \
      $(foreach p, $(targets-r-cran),  $(ircrandir)/$(p)) \
-     $(target-texlive)
+     $(target-texlive); @echo > /dev/null
 
 # Define the shell environment
 # ----------------------------
@@ -2020,7 +2021,7 @@ $(itidir)/texlive: reproduce/software/config/texlive-packages.conf \
 #	  We do not build TeXLive from source and for its installation it
 #	  downloads components from the web internally; and those
 #	  components can use '/bin/sh' (which needs 'sys_library_sh_path').
-	  export LD_LIBRARY_PATH="$(sys_library_sh_path):$$LD_LIBRARY_PATH"
+	  export LD_LIBRARY_PATH="$(sys_library_sh_path)"
 
 #	  To update itself, tlmgr needs a backup directory.
 	  backupdir=$(idir)/texlive/backups
@@ -2049,7 +2050,6 @@ $(itidir)/texlive: reproduce/software/config/texlive-packages.conf \
 #	  files (this is because we do no yet install LaTeX from source):
 	  cdir=$$(pwd)
 	  cd $(idir)/texlive
-	  $(shsrcdir)/prep-source.sh $(ibdir)
 	  cd $$cdir
 
 #	  Get all the necessary versions.
