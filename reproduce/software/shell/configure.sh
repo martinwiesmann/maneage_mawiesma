@@ -1146,6 +1146,20 @@ EOF
             echo " ** Please select another directory."
             echo ""
         else
+            # Set the '.build' and '.local' symbolic links (and delete
+            # possibly existing symbolic links). These commands are also
+            # present in the top-level 'project' script, but they are only
+            # invoked when '--build-dir' is called. When it is not called
+            # (the user wants to insert the directories interactively: the
+            # scenario here), the links need to be created from
+            # scratch. Furthermore, in case the given directory to
+            # '--build-dir' has problems (fails to pass the sanity checks
+            # above), the symbolic links also need to be recreated.
+            rm -f .build .local
+            ln -s $bdir .build
+            ln -s $bdir/software/installed .local
+
+            # Inform the user
             echo " -- Build directory set to ($instring): '$bdir'"
         fi
     done
