@@ -180,14 +180,71 @@ evolving rapidly, so some details will differ between the different
 versions. The more recent papers will tend to be the most useful as good
 working examples.
 
+ - Saremi et
+   al. [2025](https://ui.adsabs.harvard.edu/abs/2025arXiv250802780S),
+   Astronomy and Astrophysics (accepted): The project's version controlled
+   source is on [Gitlab](https://gitlab.com/nasim-projects/pipeline),
+   necessary software, outputs and backup of history are available at
+   [zenodo.16152699](https://doi.org/10.5281/zenodo.16152699); and the
+   archived git history is available at
+   [swh:1:dir:b3657cfb6053fd976695bd63c15cb99e5095648a](https://archive.softwareheritage.org/swh:1:dir:b3657cfb6053fd976695bd63c15cb99e5095648a;origin=https://gitlab.com/nasim-projects/pipeline;visit=swh:1:snp:ab7c6f0b9999f42d77154103c1bc082fa23b325c;anchor=swh:1:rev:afeb282c01983cba2a11eb4b2f25d5a40d35c164).
+
+ - Eskandarlou et
+   al. [2024](https://ui.adsabs.harvard.edu/abs/2024RNAAS...8..168E),
+   Research Notes in American Astronomical Society (RNAAS), Volume 8, Issue
+   6, id.168. The project's version controlled source is on
+   [Codeberg](https://codeberg.org/gnuastro/papers) (the `radial-profile`
+   branch). Necessary software, outputs and backup of history are available
+   at [zenodo.11403643](https://doi.org/10.5281/zenodo.11403643); and the
+   archived git history is available at
+   [swh:1:dir:4e09bf85f9f87336fa55920bf67e7bcf6d58bbd5](https://archive.softwareheritage.org/swh:1:dir:4e09bf85f9f87336fa55920bf67e7bcf6d58bbd5;origin=https://codeberg.org/gnuastro/papers;visit=swh:1:snp:557ee1a90de465659659ecc46df0c5ce29d0bb61;anchor=swh:1:rev:375e12e52080006be6a28e10980e79ef54d13d1d).
+
+ - Infante-Sainz et
+   al. [2024](https://ui.adsabs.harvard.edu/abs/2024RNAAS...8...22I),
+   Research Notes in American Astronomical Society (RNAAS), Volume 8, Issue
+   1, id.22. The project's version controlled source is on
+   [Codeberg](https://codeberg.org/gnuastro/papers) (the `radial-profile`
+   branch). Necessary software, outputs and backup of history are available
+   at [zenodo.10124582](https://doi.org/10.5281/zenodo.10124582); and the
+   archived git history is available at
+   [swh:1:dir:d5029e066916cb64f0d95d20eb88294acc78b2b1](https://archive.softwareheritage.org/swh:1:dir:d5029e066916cb64f0d95d20eb88294acc78b2b1;origin=https://codeberg.org/gnuastro/papers;visit=swh:1:snp:b065324c2ef3b48bc26e8f30e48102a1abd2052f;anchor=swh:1:rev:61764447b16da44538e5ddbf7fb69937ba138e81).
+
+ - Infante-Sainz et
+   al. [2024](https://ui.adsabs.harvard.edu/abs/2024RNAAS...8...10I),
+   Research Notes in American Astronomical Society (RNAAS), Volume 8, Issue
+   1, id.10. The project's version controlled source is on
+   [Codeberg](https://codeberg.org/gnuastro/papers) (the `color-faint-gray`
+   branch). Necessary software, outputs and backup of history are available
+   at [zenodo.10058165](https://doi.org/10.5281/zenodo.10058165); and the
+   archived git history is available at
+   [swh:1:dir:1064a48d4bb58d6684c3df33c6633a04d4141d2d](https://archive.softwareheritage.org/swh:1:dir:1064a48d4bb58d6684c3df33c6633a04d4141d2d;origin=https://codeberg.org/gnuastro/papers;visit=swh:1:snp:a083ff647c571f895d1ccc9f7432fa1b9a1d03a8;anchor=swh:1:rev:ff77b619daa50b05ddd83206d979d1f8a53d040b).
+
+ - Eskandarlou et
+   al. [2023](https://ui.adsabs.harvard.edu/abs/2023RNAAS...7..269E),
+   Research Notes in American Astronomical Society (RNAAS), Volume 7, Issue
+   12, id.269. The project's version controlled source is on
+   [Codeberg](https://codeberg.org/gnuastro/papers) (the `zeropoint`
+   branch). Necessary software, outputs and backup of history are available
+   at [zenodo.10256845](https://doi.org/10.5281/zenodo.10256845); and the
+   archived git history is available at
+   [swh:1:dir:8b2d1f63be96de3de03aa3e2bb68fa7fa52df56f](https://archive.softwareheritage.org/swh:1:dir:8b2d1f63be96de3de03aa3e2bb68fa7fa52df56f;origin=https://codeberg.org/gnuastro/papers;visit=swh:1:snp:e37e226bab517eef24d854467682b2fcf5d7dc32;anchor=swh:1:rev:ea682783d83707c0e1d114a5de74a100be9f545d).
+
+ - Akhlaghi [2023](https://ui.adsabs.harvard.edu/abs/2023RNAAS...7..211A),
+   Research Notes in American Astronomical Society (RNAAS), Volume 7, Issue
+   10, id.211. The project's version controlled source is on
+   [Codeberg](https://codeberg.org/gnuastro/papers) (the
+   `pointing-simulate` branch).
+
  - Borkowska & Roukema
-   ([2022](https://ui.adsabs.harvard.edu/abs/2021arXiv211214174B), MNRAS
-   Submitted, arXiv:2112.14174): The live version of the controlled source
-   is [at Codeberg](https://codeberg.org/boud/gevcurvtest); the main input
+   ([2022](https://ui.adsabs.harvard.edu/abs/2022CQGra..39u5007B),
+   Classical and Quantum Gravity, arXiv:2112.14174): The live version of
+   the controlled source is [at
+   Codeberg](https://codeberg.org/boud/gevcurvtest); the main input
    dataset, a software snapshot, the software tarballs, the project outputs
    and editing history are available at
    [zenodo.5806027](https://doi.org/10.5281/zenodo.5806027); and the
-   archived git history is available at [swh:1:rev:54398b720ddbac269ede30bf1e27fe27f07567f7](https://archive.softwareheritage.org/browse/revision/54398b720ddbac269ede30bf1e27fe27f07567f7).
+   archived git history is available at
+   [swh:1:rev:54398b720ddbac269ede30bf1e27fe27f07567f7](https://archive.softwareheritage.org/browse/revision/54398b720ddbac269ede30bf1e27fe27f07567f7).
 
  - Peper & Roukema
    ([2021](https://ui.adsabs.harvard.edu/abs/2021MNRAS.505.1223P), MNRAS,
@@ -580,7 +637,47 @@ First custom commit
      $ pwd                                              # Just to confirm where you are.
      ```
 
- 2. **Prepare to build project**: The `./project configure` command of the
+ 2. The final job of Maneage is to create your paper's PDF. By default it
+    uses a custom LaTeX style that resembles that of the Astrophysical
+    Journal (because the precusor of Maneage was for [Akhlaghi & Ichikawa
+    2015](https://ui.adsabs.harvard.edu/abs/2015ApJS..220....1A)). The
+    journal you plan to submit your ppaer to will have its own separate
+    style. So it is best that you start your project by writing in the
+    desired style. We have already customized Maneage for the official
+    styles of some journals. To find them, run `git branch -r | grep
+    journal`. If your planned journal is one of them, you can take the
+    following steps to start your project based on that journal's style. If
+    it is not in these, you can ignore this step for now and customize the
+    style later (you can model based on these branchs). In the commands
+    below, we'll assume you want to prepare for the Astronomy and
+    Astrophysics journal (A&A).
+
+    ```shell
+    $ git checkout -b journal origin-maneage/journal-a-and-a
+    $ git log -1 --oneline | awk '{print $1}'   # To keep the commit hash
+    $ git rebase -i main     # See description below
+    ```
+
+    In the first text editor that opens after the last command, change all
+    (except the first) `pick`s into `squash`, then save the change and
+    close the editor. In case there is no conflict, the second editor will
+    be pre-filled with all the commit messages in that branch. You do not
+    need those, so you can delete everything and write a commit message
+    like the following: `A&A journal (commit XXXXX of Maneage's
+    journal-a-and-a branch)`. Just replace the `XXXXX` with the output of
+    the second command above. The commit hash is important to be stored
+    here since it allows you to later check if any updates have been made
+    in that branch in the future. After completing the git rebase operation
+    (last command above), run the following commands below to put the new
+    commit in your `main` branch (and continue working based on that).
+
+    ```shell
+    $ git checkout main
+    $ git merge journal
+    $ git branch -D journal
+    ```
+
+ 3. **Prepare to build project**: The `./project configure` command of the
      next step will build the different software packages within the
      "build" directory (that you will specify). Nothing else on your system
      will be touched. However, since it takes long, it is useful to see
@@ -600,7 +697,7 @@ First custom commit
      $ ./project --check-config
      ```
 
- 3. **Test Maneage**: Before making any changes, it is important to test it
+ 4. **Test Maneage**: Before making any changes, it is important to test it
      and see if everything works properly with the commands below. If there
      is any problem in the `./project configure` or `./project make` steps,
      please contact us to fix the problem before continuing. Since the
@@ -618,7 +715,7 @@ First custom commit
      # Open 'paper.pdf' and see if everything is ok.
      ```
 
- 4. **Setup the remote**: You can use any [hosting
+ 5. **Setup the remote**: You can use any [hosting
      facility](https://en.wikipedia.org/wiki/Comparison_of_source_code_hosting_facilities)
      that supports Git to keep an online copy of your project's version
      controlled history. We recommend [GitLab](https://gitlab.com) because
@@ -646,7 +743,7 @@ First custom commit
      git push origin maneage                 # Push 'maneage' branch to 'origin' (no tracking).
      ```
 
- 5. **Title**, **short description** and **author**: You can start adding
+ 6. **Title**, **short description** and **author**: You can start adding
      your name (with your possible coauthors) and tentative abstract in
      `paper.tex`. You should see the relevant place in the preamble (prior
      to `\begin{document}`. Just note that some core project metadata like
@@ -659,7 +756,7 @@ First custom commit
      specific journal's style), please feel free to use it your own methods
      after finishing this checklist and doing your first commit.
 
- 6. **Delete dummy parts**: Maneage contains some parts that are only for
+ 7. **Delete dummy parts**: Maneage contains some parts that are only for
      the initial/test run, mainly as a demonstration of important steps,
      which you can use as a reference to use in your own project. But they
      not for any real analysis, so you should remove these parts as
@@ -712,7 +809,7 @@ First custom commit
        $ ./project make
        ```
 
- 7. **Ignore changes in some Maneage files**: One of the main advantages of
+ 8. **Ignore changes in some Maneage files**: One of the main advantages of
      Maneage is that you can later update your infra-structure by merging
      your `main` branch with the `maneage` branch. This is good for many
      low-level features that you will likely never modify yourself. But it
@@ -744,7 +841,7 @@ First custom commit
      $ git add .gitattributes
      ```
 
- 8. **Copyright and License notice**: It is necessary that _all_ the
+ 9. **Copyright and License notice**: It is necessary that _all_ the
      "copyright-able" files in your project (those larger than 10 lines)
      have a copyright and license notice. Please take a moment to look at
      several existing files to see a few examples. The copyright notice is
@@ -766,7 +863,7 @@ First custom commit
      Copyright (C) 2025-2025 YOUR NAME <YOUR@EMAIL.ADDRESS>
      ```
 
- 9. **Configure Git for fist time**: If this is the first time you are
+ 10. **Configure Git for fist time**: If this is the first time you are
      running Git on this system, then you have to configure it with some
      basic information in order to have essential information in the commit
      messages (ignore this step if you have already done it). Git will
@@ -780,7 +877,7 @@ First custom commit
      $ git config --global core.editor nano
      ```
 
- 10. **Your first commit**: You have already made some small and basic
+ 11. **Your first commit**: You have already made some small and basic
      changes in the steps above and you are in your project's `main`
      branch. So, you can officially make your first commit in your
      project's history and push it. But before that, you need to make sure
@@ -799,7 +896,7 @@ First custom commit
      $ git push                   # Push your commit to your remote.
      ```
 
- 11. **Read the publication checklist**: The publication checklist below is
+ 12. **Read the publication checklist**: The publication checklist below is
      very similar to this one, but for the final phase of your project. For
      now, you don't have to do any of its steps, but reading it will give
      you good insight into the later stages of your project. If you already
@@ -809,7 +906,7 @@ First custom commit
      Making it much easier to complete that checklist when you are ready
      for submission.
 
- 12. **Start your exciting research**: You are now ready to add flesh and
+ 13. **Start your exciting research**: You are now ready to add flesh and
      blood to this raw skeleton by further modifying and adding your
      exciting research steps. You can use the "published works" section in
      the introduction (above) as some fully working models to learn
