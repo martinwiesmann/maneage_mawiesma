@@ -731,7 +731,8 @@ $(ibidir)/libtiff-$(libtiff-version): $(ibidir)/libjpeg-$(libjpeg-version)
 	$(call gbuild, libtiff-$(libtiff-version), static, \
 	               --disable-jbig \
 	               --disable-webp \
-	               --disable-zstd)
+	               --disable-zstd \
+	               --disable-libdeflate )
 	echo "Libtiff $(libtiff-version)" > $@
 
 $(ibidir)/libtirpc-$(libtirpc-version):
@@ -1186,6 +1187,14 @@ $(ibidir)/ghostscript-$(ghostscript-version): \
 	tarball=ghostscript-$(ghostscript-version).tar.lz
 	$(call import-source, $(ghostscript-url), $(ghostscript-checksum))
 
+#	On macOS we use the system compiler and linker. The system linker
+#	there doesn't support '--copy-dt-needed-entries', while the one on
+#	Linux crashes if we remove it. So we only activate it on macOS.
+	ldflags=""
+	if [ x$(on_mac_os) = xno ]; then
+	     ldflags="LDFLAGS=-Wl,--copy-dt-needed-entries"
+	fi
+
 #	Unpack it and configure Ghostscript. The option
 #	'-DPNG_ARM_NEON_OPT=0' prevents an arm64 'neon' library from being
 #	required at compile time.
@@ -1193,13 +1202,13 @@ $(ibidir)/ghostscript-$(ghostscript-version): \
 	tar -xf $(tdir)/$$tarball --no-same-owner --no-same-permissions
 	cd ghostscript-$(ghostscript-version)
 	$(shsrcdir)/prep-source.sh $(ibdir)
-	./configure --prefix=$(idir) \
+	./configure $$ldflags \
 	            --disable-cups \
+	            --prefix=$(idir) \
 	            --enable-dynamic \
 	            --disable-compile-inits \
-		    --disable-hidden-visibility \
-		    CFLAGS="-DPNG_ARM_NEON_OPT=0" \
-		    LDFLAGS=-Wl,--copy-dt-needed-entries
+	            --disable-hidden-visibility \
+	            CFLAGS="-DPNG_ARM_NEON_OPT=0"
 
 #	Build and install the program and the shared libraries.
 	make    V=1 -j$(numthreads)
@@ -1224,17 +1233,24 @@ $(ibidir)/ghostscript-$(ghostscript-version): \
 	rm -rf ghostscript-$(ghostscript-version)
 	echo "GPL Ghostscript $(ghostscript-version)" > $@
 
+# Gnuastro can optionally depend on libgit2, but it is not included as a
+# dependency here for the two reasons below. If you would like to have it,
+# add it as a dependency (its build instruction and dependencies are here
+# already) and remove the '--without-libgit2' option in the recipe).
+#   - Within Maneage, we have everything under Git already and users are
+#     expected to include the version in all their products.
+#   - libgit2 can only be built with CMake (which takes extremely long to
+#     compile: possibly even longer than GCC!).
 $(ibidir)/gnuastro-$(gnuastro-version): \
                    $(ibidir)/gsl-$(gsl-version) \
                    $(ibidir)/wcslib-$(wcslib-version) \
                    $(ibidir)/libjpeg-$(libjpeg-version) \
                    $(ibidir)/libtiff-$(libtiff-version) \
-                   $(ibidir)/libgit2-$(libgit2-version) \
                    $(ibidir)/ghostscript-$(ghostscript-version)
 	tarball=gnuastro-$(gnuastro-version).tar.lz
 	$(call import-source, $(gnuastro-url), $(gnuastro-checksum))
-	$(call gbuild, gnuastro-$(gnuastro-version), static, , \
-	               -j$(numthreads))
+	$(call gbuild, gnuastro-$(gnuastro-version), static, \
+	               --without-libgit2, -j$(numthreads))
 	cp $(dtexdir)/gnuastro.tex $(ictdir)/
 	echo "GNU Astronomy Utilities $(gnuastro-version) \citep{gnuastro}" > $@
 
@@ -1719,6 +1735,12 @@ $(ibidir)/util-linux-$(util-linux-version): \
 #	'configure.ac'.
 	sed -e's|UL_BUILD_INIT(\[mkswap\], \[yes\])|UL_BUILD_INIT(\[mkswap\], \[no\])|' \
 	    -i configure.ac
+
+#	'autogen.sh' checks for dependencies, but 'flex' (that is not built
+#	in Maneage) is not needed when compiling from tarball (see:
+#	https://github.com/util-linux/util-linux/pull/2531#issuecomment-1798020594)
+	sed -i '/flex/d' autogen.sh
+	./autogen.sh
 
 #	Having updated 'configure.ac', we need to re-generate the
 #	'./configure' script with 'autoreconf' (which is part of Autoconf

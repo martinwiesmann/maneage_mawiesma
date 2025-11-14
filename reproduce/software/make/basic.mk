@@ -344,24 +344,22 @@ $(ibidir)/zlib-$(zlib-version): | $(ibdir) $(ildir) $(lockdir)
 	echo "Zlib $(zlib-version)" > $@
 
 # GNU Tar: When built statically, tar gives a segmentation fault on
-# unpacking Bash. So we'll build it dynamically. Note that technically, zip
-# and unzip aren't dependencies of Tar, but for a clean build, we'll set
-# Tar to be the last compression-related software (the first-set of
-# software to be built).
+# unpacking Bash. So we'll build it dynamically.
 $(ibidir)/tar-$(tar-version): \
               $(ibidir)/xz-$(xz-version) \
               $(ibidir)/gzip-$(gzip-version) \
               $(ibidir)/zlib-$(zlib-version) \
               $(ibidir)/bzip2-$(bzip2-version)
 
-#	Since all later programs depend on Tar, the configuration will hit
-#	a bottleneck here: only making Tar. So its more efficient to built
-#	it on multiple threads (even when the user's Make doesn't pass down
-#	the number of threads).
+#	About the onfigurations: nls and iconv were creating problems with
+#	the dependencies on MacOs and are not relevant in the context of
+#	Maneage, hence, they are disabled.
 	$(call unsafe-config)
 	tarball=tar-$(tar-version).tar.lz
 	$(call import-source, $(tar-url), $(tar-checksum))
-	$(call gbuild, tar-$(tar-version), , , -j$(numthreads) V=1)
+	$(call gbuild, tar-$(tar-version), , \
+	               --disable-nls am_cv_func_iconv=no, \
+	               -j$(numthreads) V=1)
 	echo "GNU Tar $(tar-version)" > $@
 
 
@@ -540,6 +538,7 @@ $(ibidir)/readline-$(readline-version): \
 #       pname=bash50-$(printf "%03d" $i); \
 #       wget http://ftp.gnu.org/gnu/bash/bash-5.0-patches/$pname -O ../$pname;\
 #       patch -p0 -i ../$pname; \
+#       rm ../$pname; \
 #     done
 #   $ cd ..
 #   $ mv bash-5.0 bash-5.0.$number
@@ -565,7 +564,7 @@ $(ibidir)/bash-$(bash-version): \
 	if [ "x$(static_build)" = xyes ]; then stopt="--enable-static-link"
 	else                                   stopt=""
 	fi;
-	export CFLAGS="$$CFLAGS -std=gnu17 \
+	export CFLAGS="$$CFLAGS \
 	               -DDEFAULT_PATH_VALUE='\"$(ibdir)\"' \
 	               -DSTANDARD_UTILS_PATH='\"$(ibdir)\"'  \
 	               -DSYS_BASHRC='\"$(BASH_ENV)\"' "
@@ -1065,10 +1064,6 @@ $(ibidir)/grep-$(grep-version): $(ibidir)/coreutils-$(coreutils-version)
 	               -j$(numthreads) V=1)
 	echo "GNU Grep $(grep-version)" > $@
 
-# M4 doesn't depend on PatchELF, but just to be consistent with the
-# levels/phases introduced here (where the compressors are level 1,
-# PatchELF is level 2, and ...), we'll set it as a dependency.
-#
 # The '--with-syscmd-shell' is used as the default shell and if not given,
 # 'm4' will use '/bin/sh' (which is not under Maneage control and can cause
 # problems in 'high-level.mk' because it closes off the system's
@@ -1076,10 +1071,9 @@ $(ibidir)/grep-$(grep-version): $(ibidir)/coreutils-$(coreutils-version)
 # library, the high-level programs will not be built). We are setting this
 # default shell to Dash because M4 is built before our own Bash. Recall
 # that Dash is built before we enter this Makefile.
-$(ibidir)/m4-$(m4-version): $(ibidir)/patchelf-$(patchelf-version)
+$(ibidir)/m4-$(m4-version): $(ibidir)/libiconv-$(libiconv-version)
 	tarball=m4-$(m4-version).tar.lz
 	$(call import-source, $(m4-url), $(m4-checksum))
-	export CFLAGS="-std=gnu17 $$CFLAGS"
 	$(call gbuild, m4-$(m4-version), static, \
 	               --with-syscmd-shell=$(ibdir)/dash, \
 	               -j$(numthreads) V=1)

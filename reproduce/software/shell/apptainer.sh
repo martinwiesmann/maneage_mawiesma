@@ -291,10 +291,11 @@ else
     # necessary tools.
     if [ -f $base_name ]; then
         if [ $quiet = 0 ]; then
-            printf "$scriptname: info: base OS docker image ('$base_name') "
-            printf "already exists and will be used. If you want to build a "
-            printf "new base OS image, give a new name to '--base-name'. "
-            printf "To remove this message run with '--quiet'\n"
+            printf "$scriptname: info: base OS apptainer image "
+            printf "('$base_name') already exists and will be used. "
+            printf "If you want to build a new base OS image, give "
+            printf "a new name to '--base-name'. To remove this "
+            printf "message run with '--quiet'\n"
         fi
     else
 

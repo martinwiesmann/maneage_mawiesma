@@ -77,6 +77,20 @@ fi
 if [ -f "$bindir/bash" ]; then shpath="$bindir"/bash
 else                           shpath="$bindir"/dash
 fi
+
+# On MacOS the syntax for 'stat' is a bit different, so if we are using the
+# system one on mac we need a specific syntax. The one installed by maneage
+# instead uses the ordinary Linux syntax.
+if [ -f "$bindir/stat" ] || [ x"$on_mac_os" = xno ]; then
+  format="--format %a"
+else
+  format="-f %OLp"
+fi
+
+# On MacOS 'touch' wants the time expressed according to ISO8601 with a
+# precision up to the seconds. We then use 'sed' to remove the information
+# regarding the timezone, as the format is not accepted by 'touch'.
+# LCTYPE and LANG are also required on macos systems by sed.
 grep -I -r -e'/bin/sh' $(pwd)/* \
     | sed -e's|:|\t|' \
     | awk 'BEGIN{FS="\t"}{print $1}' \
@@ -84,8 +98,10 @@ grep -I -r -e'/bin/sh' $(pwd)/* \
     | uniq \
     | while read filename; do \
          tmp="$filename".tmp; \
-         origtime="$(date -R -r "$filename")"; \
-         origperm=$(stat -c '%a' "$filename"); \
+         origtimex="$(date -Iseconds -r "$filename")"; \
+         origtime=$(echo $origtimex | sed 's/.\{6\}$//'); \
+         origperm=$(stat $format "$filename"); \
+         LC_CTYPE=C; LANG=C; \
          sed -e's|/bin/sh|'"$shpath"'|g' "$filename" > "$tmp"; \
          mv "$tmp" "$filename"; \
          chmod $origperm "$filename"; \

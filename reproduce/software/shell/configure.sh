@@ -1891,9 +1891,10 @@ ______________________________________________________
 !!!!!!!!!!!!!!!        Warning        !!!!!!!!!!!!!!!!
 
 TeX Live couldn't be installed during the configuration (probably because
-there were downloading problems). TeX Live is only necessary in making the
-final PDF (which is only done after all the analysis has been complete). It
-is not used at all during the analysis.
+there were downloading problems, or you used the '--offline' option). TeX
+Live is only necessary in making the final PDF (which is only done after
+all the analysis has been complete). It is not used at all during the
+analysis.
 
 Therefore, if you don't need the final PDF, and just want to do the
 analysis, you can safely ignore this warning and continue.

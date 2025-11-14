@@ -47,7 +47,7 @@ software environment) to easily move it from one computer to another.
       project. This file is necessary for future runs of your project
       within the container.
 
- 3. To execute your project remote the `--build-only` and use `./run.sh` to
+ 3. To execute your project remove the `--build-only` and use `./run.sh` to
     execute it. If you want to enter your Maneage'd project shell, add the
     `--project-shell` option to the call inside `./run.sh`.
 

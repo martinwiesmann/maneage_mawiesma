@@ -51,6 +51,9 @@ basedir=$PWD
 scriptname=$0
 
 
+
+
+
 # The --help output
 print_help() {
     cat <<EOF
