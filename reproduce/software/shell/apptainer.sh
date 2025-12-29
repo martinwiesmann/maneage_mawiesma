@@ -71,14 +71,14 @@ set -e
 
 
 # Default option values
+sif=""
 jobs=0
 quiet=0
 source_dir=
 build_only=
-base_name=""
+base_sif=""
 shm_size=20gb
 scriptname="$0"
-project_name=""
 project_shell=0
 container_shell=0
 base_os=debian:stable-slim
@@ -97,9 +97,9 @@ Top-level script to build and run a Maneage'd project within Apptainer.
       --source-dir=STR     Directory of source code (default: 'pwd -P').
 
  Apptainer images
+      --sif=STR            Project's apptainer image (a '.sif' file).
       --base-os=STR        Base OS name (default: '$base_os').
-      --base-name=STR      Base OS apptainer image (a '.sif' file).
-      --project-name=STR   Project's apptainer image (a '.sif' file).
+      --base-sif=STR       Base OS apptainer image (a '.sif' file).
 
  Interactive shell
       --project-shell      Open the project's shell within the container.
@@ -155,10 +155,12 @@ do
   --source-dir=*)        source_dir="${1#*=}";                        check_v "$1" "$source_dir";   shift;;
 
   # Container options.
-  --base-name)           base_name="$2";                              check_v "$1" "$base_name";    shift;shift;;
-  --base-name=*)         base_name="${1#*=}";                         check_v "$1" "$base_name";    shift;;
-  --project-name)        project_name="$2";                           check_v "$1" "$project_name"; shift;shift;;
-  --project-name=*)      project_name="${1#*=}";                      check_v "$1" "$project_name"; shift;;
+  --sif)                 sif="$2";                                    check_v "$1" "$sif";         shift;shift;;
+  --sif=*)               sif="${1#*=}";                               check_v "$1" "$sif";         shift;;
+  --base-os)             base_os="$2";                                check_v "$1" "$base_os";     shift;shift;;
+  --base-os=*)           base_os="${1#*=}";                           check_v "$1" "$base_os";     shift;;
+  --base-sif)            base_sif="$2";                               check_v "$1" "$base_sif";    shift;shift;;
+  --base-sif=*)          base_sif="${1#*=}";                          check_v "$1" "$base_sif";    shift;;
 
   # Interactive shell.
   --project-shell)       project_shell=1;                                                           shift;;
@@ -206,8 +208,8 @@ fi
 
 # Set the default project and base-OS image names (inside the build
 # directory).
-if [ x"$base_name" = x ]; then base_name=$build_dir/maneage-base.sif; fi
-if [ x"$project_name" = x ]; then project_name=$build_dir/maneaged.sif; fi
+if [ x"$base_sif" = x ]; then base_sif=$build_dir/maneage-base.sif; fi
+if [ x"$sif" = x ]; then sif=$build_dir/maneaged.sif; fi
 
 
 
@@ -278,9 +280,9 @@ fi
 #
 # Build the base operating system using Maneage's './project configure'
 # step.
-if [ -f $project_name ]; then
+if [ -f $sif ]; then
     if [ $quiet = 0 ]; then
-        printf "$scriptname: info: project's image ('$project_name') "
+        printf "$scriptname: info: project's image ('$sif') "
         printf "already exists and will be used. If you want to build a "
         printf "new project image, give a new name to '--project-name'. "
         printf "To remove this message run with '--quiet'\n"
@@ -289,12 +291,12 @@ else
 
     # Build the basic definition, with just Debian-slim with minimal
     # necessary tools.
-    if [ -f $base_name ]; then
+    if [ -f $base_sif ]; then
         if [ $quiet = 0 ]; then
             printf "$scriptname: info: base OS apptainer image "
-            printf "('$base_name') already exists and will be used. "
+            printf "('$base_sif') already exists and will be used. "
             printf "If you want to build a new base OS image, give "
-            printf "a new name to '--base-name'. To remove this "
+            printf "a new name to '--base-sif'. To remove this "
             printf "message run with '--quiet'\n"
         fi
     else
@@ -309,7 +311,7 @@ From: $base_os
 EOF
         # Build the base operating system container and delete the
         # temporary definition file.
-        apptainer build $base_name $base_def
+        apptainer build $base_sif $base_def
         rm $base_def
     fi
 
@@ -330,7 +332,7 @@ EOF
     maneage_def=$build_dir/maneage.def
     cat <<EOF > $maneage_def
 Bootstrap: localimage
-From: $base_name
+From: $base_sif
 
 %setup
   mkdir -p \${APPTAINER_ROOTFS}/home/maneager/input
@@ -385,7 +387,7 @@ EOF
               $software_dir_mnt \
               --ignore-fakeroot-command \
               \
-              $project_name \
+              $sif \
               $maneage_def
 
     # Clean up.
@@ -397,7 +399,7 @@ fi
 if ! [ x"$build_only" = x ]; then
     if [ $quiet = 0 ]; then
         printf "$scriptname: info: Maneaged project has been configured "
-        printf "successfully in the '$project_name' image"
+        printf "successfully in the '$sif' image"
     fi
     exit 0
 fi
@@ -419,7 +421,7 @@ else
 fi
 
 # Build the hostname from the name of the SIF file of the project name.
-hstname=$(echo "$project_name" \
+hstname=$(echo "$sif" \
               | awk 'BEGIN{FS="/"}{print $NF}' \
               | sed -e's|.sif$||')
 
@@ -454,4 +456,4 @@ apptainer $aopt \
           --hostname $hstname \
           --cwd /home/maneager/source \
           \
-          $project_name
+          $sif

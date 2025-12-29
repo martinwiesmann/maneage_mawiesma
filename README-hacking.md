@@ -180,11 +180,22 @@ evolving rapidly, so some details will differ between the different
 versions. The more recent papers will tend to be the most useful as good
 working examples.
 
+ - Eskandarlou et
+   al. [2026](https://ui.adsabs.harvard.edu/abs/2025arXiv251012940E),
+   Astronomy and Astrophysics (A&A), accepted. The project's version
+   controlled source is on
+   [Gitlab](https://gitlab.com/Sepideh.Esk/psf-j-plus), necessary software,
+   outputs and backup of history are available at
+   [zenodo.17348653](http://doi.org/10.5281/zenodo.17348653); and the
+   archived git history is available at
+   [swh:1:dir:fc95ed9ad173de6fa64690e3d71ab041c630f32c](https://archive.softwareheritage.org/swh:1:dir:fc95ed9ad173de6fa64690e3d71ab041c630f32c;origin=https://gitlab.com/Sepideh.Esk/psf-j-plus;visit=swh:1:snp:31bb4550902f7902a0a65d0674106271de776d3e;anchor=swh:1:rev:4860c70d6285a60300e429889e8637e98568a915).
+
  - Saremi et
-   al. [2025](https://ui.adsabs.harvard.edu/abs/2025arXiv250802780S),
-   Astronomy and Astrophysics (accepted): The project's version controlled
-   source is on [Gitlab](https://gitlab.com/nasim-projects/pipeline),
-   necessary software, outputs and backup of history are available at
+   al. [2025](https://ui.adsabs.harvard.edu/abs/2025A%26A...701A.116S),
+   Astronomy and Astrophysics (A&A), Volume 701, id.A116. The project's
+   version controlled source is on
+   [Gitlab](https://gitlab.com/nasim-projects/pipeline), necessary
+   software, outputs and backup of history are available at
    [zenodo.16152699](https://doi.org/10.5281/zenodo.16152699); and the
    archived git history is available at
    [swh:1:dir:b3657cfb6053fd976695bd63c15cb99e5095648a](https://archive.softwareheritage.org/swh:1:dir:b3657cfb6053fd976695bd63c15cb99e5095648a;origin=https://gitlab.com/nasim-projects/pipeline;visit=swh:1:snp:ab7c6f0b9999f42d77154103c1bc082fa23b325c;anchor=swh:1:rev:afeb282c01983cba2a11eb4b2f25d5a40d35c164).
@@ -641,7 +652,7 @@ First custom commit
     uses a custom LaTeX style that resembles that of the Astrophysical
     Journal (because the precusor of Maneage was for [Akhlaghi & Ichikawa
     2015](https://ui.adsabs.harvard.edu/abs/2015ApJS..220....1A)). The
-    journal you plan to submit your ppaer to will have its own separate
+    journal you plan to submit your paper to will have its own separate
     style. So it is best that you start your project by writing in the
     desired style. We have already customized Maneage for the official
     styles of some journals. To find them, run `git branch -r | grep
@@ -1090,7 +1101,7 @@ $ git status             # Just for a check
 above) with the classification `both modified:`. Open one of these files
 with your favorite text editor and correct the conflict (placed in between
 `<<<<<<<`, `=======` and `>>>>>>>`).  Once all conflicts in a file are
-remoted, the file will be automatically removed from the "Unmerged paths"
+removed, the file will be automatically removed from the "Unmerged paths"
 of `git status`. So run `git status` after correcting the conflicts of each
 file just to make sure things are clean. TIP: If you want the changes in
 one file to be only from a special branch (`maneage` or `main`, completely

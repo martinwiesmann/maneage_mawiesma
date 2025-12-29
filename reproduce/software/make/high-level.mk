@@ -1830,6 +1830,7 @@ $(ibidir)/vim-$(vim-version):
 	unpackdir=vim-$(vim-version)
 	cd $(ddir)/$$unpackdir
 	$(shsrcdir)/prep-source.sh $(ibdir)
+	export CFLAGS="-std=gnu17 $$CFLAGS"
 	./configure --prefix=$(idir) \
 	            --disable-canberra \
 	            --enable-multibyte \
