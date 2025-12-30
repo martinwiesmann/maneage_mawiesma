@@ -1236,22 +1236,58 @@ $(ibidir)/ghostscript-$(ghostscript-version): \
 # Gnuastro can optionally depend on libgit2, but it is not included as a
 # dependency here for the two reasons below. If you would like to have it,
 # add it as a dependency (its build instruction and dependencies are here
-# already) and remove the '--without-libgit2' option in the recipe).
+# already), then remove the '--without-libgit2' configure option) and also
+# comment the following two generic configuration lines: 'outfitsnocommit'
+# and 'outfitsnoconfig'.
 #   - Within Maneage, we have everything under Git already and users are
 #     expected to include the version in all their products.
 #   - libgit2 can only be built with CMake (which takes extremely long to
 #     compile: possibly even longer than GCC!).
+#   - Maneage is often run on HPCs that can have network connections
+#     between the storage and processer and the necessary libgit2
+#     operations on every created file can have a performance impact.
 $(ibidir)/gnuastro-$(gnuastro-version): \
                    $(ibidir)/gsl-$(gsl-version) \
                    $(ibidir)/wcslib-$(wcslib-version) \
                    $(ibidir)/libjpeg-$(libjpeg-version) \
                    $(ibidir)/libtiff-$(libtiff-version) \
                    $(ibidir)/ghostscript-$(ghostscript-version)
+
+#	Generic installation.
 	tarball=gnuastro-$(gnuastro-version).tar.lz
 	$(call import-source, $(gnuastro-url), $(gnuastro-checksum))
 	$(call gbuild, gnuastro-$(gnuastro-version), static, \
 	               --without-libgit2, -j$(numthreads))
 	cp $(dtexdir)/gnuastro.tex $(ictdir)/
+
+#	Generally, besides the Git commit, we are also disabling the
+#	default mode of printing any type of metadata and versions of
+#	dependencies in output headers (through the installation-wide
+#	configuration file). This is done because within a large pipeline,
+#	Gnuastro is used to create many intermediate files (that are
+#	deleted shortly after being created) and it is not worth the
+#	overhread to keep this information in those intermediate products:
+#	it is the pipeline's responsibility to put them in the final
+#	outputs. We recommend to use the Gnuastro Fits program's keyword
+#	writing options to add as much contextual metadata on your final
+#	products as possible. Some tips:
+#	  - The creation date is not good (because it is not reproducible
+#	    and will make simple validation hard). The project's Commit
+#	    should be used instead.
+#	  - Define a keyword to keep the public URL of the repository of
+#	    the Maneage'd project. In this way, a person who gets your
+#	    final product can easily check that for all the information
+#	    (including software versions and configuration options).
+	gconf=$(idir)/etc/gnuastro/gnuastro.conf
+	echo ""                       >> $$gconf
+	echo "# Maneage specific (see Gnuastro build rule for details)." \
+	                              >> $$gconf
+	echo " outfitsnocommit   = 1" >> $$gconf
+	echo " outfitsnoconfig   = 1" >> $$gconf
+	echo " outfitsnodate     = 1" >> $$gconf
+	echo " outfitsnoversions = 1" >> $$gconf
+
+#	Final target.
 	echo "GNU Astronomy Utilities $(gnuastro-version) \citep{gnuastro}" > $@
 
 $(ibidir)/icu-$(icu-version): $(ibidir)/python-$(python-version)
