@@ -1770,6 +1770,7 @@ $(ibidir)/util-linux-$(util-linux-version): \
 #	manually by commenting the relevant files in the
 #	'configure.ac'.
 	sed -e's|UL_BUILD_INIT(\[mkswap\], \[yes\])|UL_BUILD_INIT(\[mkswap\], \[no\])|' \
+	    -e's|UL_BUILD_INIT(\[bits\], \[yes\])|UL_BUILD_INIT(\[bits\], \[no\])|' \
 	    -i configure.ac
 
 #	'autogen.sh' checks for dependencies, but 'flex' (that is not built
@@ -1787,7 +1788,6 @@ $(ibidir)/util-linux-$(util-linux-version): \
 	export CONFIG_SHELL=$(ibdir)/bash
 	./configure --prefix=$(idircustom)/util-linux \
 	            --disable-dependency-tracking \
-	            --enable-libmount-support-mtab \
 	            --disable-silent-rules \
 	            --disable-liblastlog2 \
 	            --disable-mountpoint \
