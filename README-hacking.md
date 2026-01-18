@@ -185,12 +185,23 @@ Library](https://scixplorer.org) (successor to the [NASA
 ADS](https://ui.adsabs.harvard.edu)) which contains further bibliographic
 information like title, DOI and etc, in a unified format (independent of
 which journal the paper is published in).
+
+ - Eskandarlou et
+   al. ([2026](https://scixplorer.org/abs/2026arXiv260322166E), A&A
+   accepted;
+   arXiv:[2603.22166](https://arxiv.org/abs/2510.2603.22166)). The
+   project's version controlled source is on
+   [Gitlab](https://gitlab.com/sepideh.esk/alba), necessary software,
+   outputs and backup of history are available at
+   [zenodo.17674805](http://doi.org/10.5281/zenodo.17674805); and the
+   archived git history is available at
+   [swh:1:dir:7c203a565ec6ef40d8419dbdf70e8639b78f4b99](https://archive.softwareheritage.org/swh:1:dir:7c203a565ec6ef40d8419dbdf70e8639b78f4b99;origin=https://gitlab.com/Sepideh.Esk/alba;visit=swh:1:snp:adc584ff3540ea3151de6ebc8462805e8818b1f4;anchor=swh:1:rev:f9d0f9cb25c80415107c962cc53d369a650e9b82).
  - Eskandarlou et
    al. ([2026](https://scixplorer.org/abs/2026A%26A...705A..67E), A&A,
    Volume 705, id.A67, 14 pp;
    arXiv:[2510.12940](https://arxiv.org/abs/2510.12940)). The project's
    version controlled source is on
-   [Gitlab](https://gitlab.com/Sepideh.Esk/psf-j-plus), necessary software,
+   [Gitlab](https://gitlab.com/sepideh.esk/psf-j-plus), necessary software,
    outputs and backup of history are available at
    [zenodo.17348653](http://doi.org/10.5281/zenodo.17348653); and the
    archived git history is available at
@@ -234,6 +245,17 @@ which journal the paper is published in).
    at [zenodo.10058165](https://doi.org/10.5281/zenodo.10058165); and the
    archived git history is available at
    [swh:1:dir:1064a48d4bb58d6684c3df33c6633a04d4141d2d](https://archive.softwareheritage.org/swh:1:dir:1064a48d4bb58d6684c3df33c6633a04d4141d2d;origin=https://codeberg.org/gnuastro/papers;visit=swh:1:snp:a083ff647c571f895d1ccc9f7432fa1b9a1d03a8;anchor=swh:1:rev:ff77b619daa50b05ddd83206d979d1f8a53d040b).
+ - Peper, Roukema & Bolejko
+   ([2023](https://scixplorer.org/abs/2023MNRAS.525...91P), MNRAS, 525, 91,
+   DOI:10.1093/mnras/stad2246,
+   arXiv:[2304.00591](https://arxiv.org/abs/2304.00591)): The live version
+   of the controlled source is [at
+   Codeberg](https://codeberg.org/mpeper/lensing); the main input
+   dataset, a software snapshot, the software tarballs, the project outputs
+   and editing history are available at
+   [zenodo.8103985](https://zenodo.org/record/8103985); and the archived
+   git history is available at
+   [swh:1:dir:f57fd0e254bcb976c1ab34b6c9c9708e891f7914](https://archive.softwareheritage.org/swh:1:dir:f57fd0e254bcb976c1ab34b6c9c9708e891f7914;origin=https://codeberg.org/mpeper/lensing;visit=swh:1:snp:984413c49bb02ee0eec88c3ac01614808d57beb7;anchor=swh:1:rev:185c36f1b6263588526be3881078626869041882).
  - Eskandarlou et
    al. ([2023](https://scixplorer.org/abs/2023RNAAS...7..269E), RNAAS,
    Volume 7, Issue 12, id.269;
@@ -557,26 +579,25 @@ project files. However, file dates are important in the current design of
 Maneage: Make checks the dates of the prerequisite files and target files
 to see if the target should be re-built.
 
-To fix this problem, for Maneage we use a forked version of
-[Metastore](https://github.com/mohammad-akhlaghi/metastore). Metastore use
-a binary database file (which is called `.file-metadata`) to keep the
-modification dates of all the files under version control. This file is
-also under version control, but is hidden (because it shouldn't be modified
-by hand). During the project's configuration, Maneage installs to Git hooks
-to run Metastore 1) before making a commit to update its database with the
-file dates in a branch, and 2) after doing a checkout, to reset the
-file-dates after the checkout is complete and re-set the file dates back to
-what they were.
+This is relevant, for example, in the `analysis/` side of calculations when
+a rule in a `reproduce/analysis/make/SOMETHING.mk` is dependent on
+`reproduce/analysis/conf/SOMETHING.conf` (where `SOMETHING` is one of the
+science pipeline steps that you have prepared). Switching back and forth
+between git branches will update the timestamp on `SOMETHING.conf`,
+incorrectly implying, according to the Make rules, that a rule in
+SOMETHING.mk has to be run again.
 
-In practice, Metastore should work almost fully invisibly within your
-project. The only place you might notice its presence is that you'll see
-`.file-metadata` in the list of modified/staged files (commonly after
-merging your branches). Since its a binary file, Git also won't show you
-the changed contents. In a merge, you can simply accept any changes with
-`git add -u`. But if Git is telling you that it has changed without a merge
-(for example if you started a commit, but canceled it in the middle), you
-can just do `git checkout .file-metadata` and set it back to its original
-state.
+To address this problem, you can use the `touch` command to backdate the
+timestamp of files that you want to be considered to be old. For example
+with the command below:
+
+```shell
+$ touch --date=2000-01-01 reproduce/analysis/conf/SOMETHING.conf
+$ ls -l reproduce/analysis/conf/SOMETHING.conf # to check
+```
+
+You may want to use a date that is obviously (to you) fake, so that you
+don't accidentally believe the date later on.
 
 
 
@@ -1434,6 +1455,50 @@ future.
    are public). If not, you can mention that everything is ready for such a
    submission after acceptance.
 
+     * Some journals (like the "Astronomy and Astrophysics" journal)
+       require that only a single LaTeX file be submitted without any
+       commens (along with all the figures). In other words, they do not
+       want any sub-directories: only a single LaTeX file, one `.bbl` file
+       and one PDF per figure. Here is how you can do this:
+       ```shell
+       # If you don't already have 'latexpand' in your OS, install it:
+       $ tlmgr install latexpand
+
+       # Unpack the tarball and make a directory for a single-LaTeX source.
+       $ tar -xf maneaged-XXXXXXX.tar.gz
+       $ cd maneaged-XXXXXXX.tar.gz
+       $ mkdir one-latex
+
+       ## The '--empty-comments' and subsequent call to AWK (that removes
+       ## lines starting with '%') is because we need the lines ending in a
+       ## '%' for some LaTeX macros).
+       $ latexpand paper.tex --output=one-latex/paper-0.tex \
+                   --empty-comments
+       $ awk '!/^%/' one-latex/paper-0.tex > one-latex/paper.tex
+       $ rm one-latex/paper-0.tex
+
+       ## Copy the other necessary files (if you are using specific journal
+       ## style files, also copy them).
+       $ cp paper.bbl one-latex/
+       $ cp tex/tikz/*.pdf one-latex/
+
+       ## Correct the location of the images.
+       $ sed -i -e's|tex/tikz/|./|' one-latex/paper.tex
+       ```
+
+        * You can confirm the contents of the `one-latex` directory made
+          above by running `pdflatex paper` inside that directory. Your
+          operating system's LaTeX may not have all the necessary packages,
+          in that case run `tlmgr install XXXXX` (where `XXXXX` is the
+          value of `texlive-packages` in
+          `reproduce/software/config/texlive-packages.conf`. Afterwards,
+          clean up all the temporary files with this command:
+          ```shell
+          $ rm *.log *.aux *.auxlock *.bcf *.out *.xml
+          ```
+
+        * Upload the contents of this `one-latex` directory to the journal.
+
  - **Future versions**: Both Zenodo and arXiv allow uploading new versions
    after your first publication. So it is recommended to put more recent
    versions of your published projects later (for example after applying
@@ -1793,6 +1858,41 @@ for the benefit of others.
 
 
 
+Maneage Development Workflow
+============================
+
+Maneage users can only use it by developing it, therefore Maneage is a very
+unique software: the boundary between a user and developer is very blurry
+by design/philosophy. We hope that all users can contribute to the
+`maneage` branch for project-agnostic bugs/features that they fix/add. In
+this section, the development workflow is described:
+
+ - At any point that you find a bug or want to share a fix, anyone is
+   welcome to open a "Bug" or "Task" on GNU Savannah (which is the main
+   project management interface of Maneage). In case the submitter already
+   has a commit to merge, they can fork Maneage (similar to [this forking
+   tutorial](https://www.gnu.org/software/gnuastro/manual/html_node/Forking-tutorial.html))
+   and share their commit in the Savannah post.
+
+ - The review of bugs and merge requests will happen at the earliest
+   possible time for the maintainer. At this point, the maintainer will
+   create a new development branch over the `maneage` branch in a
+   development repository (not the main Maneage repository) and all
+   separate merge requests will be rebased over that branch. Finally, all
+   the commits in that branch will be `squash`ed into a single commit that
+   will be merged over the `maneage` branch. Of course, every contributor
+   will be acknowledged in the squashed commit for their contribution.
+
+   - The `squash`ing into a single commit is intentionally done because the
+     `maneage` branch is shared between all projects that use Maneage and
+     we do not want to introduce complexity in their history by preserving
+     all the various development commits that were done before the
+     merge.
+
+   - After the merge, the development branch may be deleted from the
+     development repository: any historically relevant point that you find
+     when making a commit should be written as comments within the source
+     (to be preserved during the squash) and not in the commit message.
 
 
 

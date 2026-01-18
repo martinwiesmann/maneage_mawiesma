@@ -105,12 +105,13 @@ endif
 export CPPFLAGS := -I$(idir)/include $(CPPFLAGS) $(noccwarnings)
 
 # This is the "basic" tools where we are relying on the host operating
-# system, but are slowly populating our basic software envirnoment. To run
-# (system or template) programs, 'LD_LIBRARY_PATH' is necessary, so here,
-# we'll first tell the programs to look into any possible pre-defined
-# 'LD_LIBRARY_PATH', then we'll add our own newly installed libraries.  We
-# will also make sure that there is no "current directory" in it (by
-# removing a starting or trailing ':' and any occurance of '::'.
+# system, but are slowly populating our basic software envirnoment. So
+# here, we are also appending the host's 'LD_LIBRARY_PATH' to Maneage's
+# installed library path. It is just important to keep Maneage's library
+# directories first so when something has been built, the newly built
+# software use (link-with) Maneage's libraries, not the host's. We will
+# also make sure that there is no "current directory" in it (by removing a
+# starting or trailing ':' and any occurance of '::').
 #
 # But first: in case LD_LIBRARY_PATH is empty, give it the default value of
 # $(sys_library_sh_path) (which was the location of the libraries needed by
@@ -120,7 +121,7 @@ export CPPFLAGS := -I$(idir)/include $(CPPFLAGS) $(noccwarnings)
 ifeq ($(strip $(LD_LIBRARY_PATH)),)
 export LD_LIBRARY_PATH=$(sys_library_sh_path)
 endif
-export LD_LIBRARY_PATH := $(shell echo $(LD_LIBRARY_PATH):$(ildir) \
+export LD_LIBRARY_PATH := $(shell echo $(ildir):$(LD_LIBRARY_PATH) \
                                   | sed -e's/::/:/g' -e's/^://' -e's/:$$//')
 
 # RPATH is automatically written in macOS, so 'DYLD_LIBRARY_PATH' is
@@ -253,6 +254,23 @@ $(ibidir)/low-level-links: $(ibidir)/grep-$(grep-version) \
 #	systems)
 	$(call makelink,ldd)
 
+#	zic: On some systems like Debian GNU/Linux, 'zic' may be in
+#	'/usr/sbin' and is available to users. But it is not normally in
+#	the 'PATH' of a non-root user. This is because the executables
+#	there are normally system-level commands, and most are executable
+#	only by the root user.
+	$(call makelink,zic)
+	if [ "x$$(command -v zic)" = x ]; then
+	   zicfullpath=$$(PATH=$${PATH}:/usr/sbin command -v zic)
+	   if [ "x$${zicfullpath}" = x ]; then
+	      printf "Warning: 'zic' not found. You may need it for"
+	      printf " higher-level packages such as 'tzdb'. Install"
+	      printf " 'zic' if needed.\n"
+	   else
+	      ln -sf $$(realpath $${zicfullpath}) $(ibdir)/zic
+	   fi
+	fi
+
 #	We want this to be empty (so it doesn't interefere with the other
 #	files in 'ibidir'.
 	touch $@
@@ -376,8 +394,8 @@ $(ibidir)/tar-$(tar-version): \
 # Patchelf is necessary for some software on GNU/Linux systems, its job is
 # to manually insert RPATH into the dynamically-linked executable. Since
 # all the other software depend on Pathelf, to avoid manually repeating as
-# a prerequisite (and forgetting in others causing bugs), we'll put it as a
-# dependancy of 'tar'.
+# a prerequisite (and forgetting in others causing bugs), it is installed
+# in this phase (right after 'tar').
 $(ibidir)/patchelf-$(patchelf-version): $(ibidir)/tar-$(tar-version)
 	tarball=patchelf-$(patchelf-version).tar.lz
 	$(call import-source, $(patchelf-url), $(patchelf-checksum))
@@ -388,7 +406,47 @@ $(ibidir)/patchelf-$(patchelf-version): $(ibidir)/tar-$(tar-version)
 	  echo "PatchELF $(patchelf-version)" > $@
 	fi
 
+$(ibidir)/pkg-config-$(pkgconfig-version): $(ibidir)/tar-$(tar-version)
 
+#	Download the tarball.
+	tarball=pkg-config-$(pkgconfig-version).tar.lz
+	$(call import-source, $(pkgconfig-url), $(pkgconfig-checksum))
+
+#	An existing 'libiconv' can cause a conflict with 'pkg-config' (this
+#	is why 'libiconv' depends on 'pkg-config'). On a clean build,
+#	'pkg-config' is built first. But when we don't have a clean build
+#	(and 'libiconv' exists) there will be a problem. So before
+#	re-building 'pkg-config', we'll remove any installation of
+#	'libiconv'.
+	rm -f $(ildir)/libiconv* $(idir)/include/iconv.h
+
+#	Some Mac OS systems may have a version of the GNU C Compiler (GCC)
+#	installed that doesn't support some necessary features of building
+#	Glib (as part of pkg-config), so we will disable pkg-config's
+#	internal Glib for Mac systems, and to be further safe, we'll make
+#	sure it will use LLVM's Clang.
+#
+#	On macOS systems, to ensure that Clang can build pkg-config, take
+#	the following steps:
+#	1. Install the latest Glib via Homebrew:
+#	    brew install glib
+#	2. Set these environment variables before configuring Maneage:
+#	    export GLIB_CFLAGS=$(pkg-config --cflags glib-2.0)
+#	    export GLIB_LIBS=$(pkg-config --libs glib-2.0)
+#   	3. Ensure PKG_CONFIG_PATH includes Homebrew's pkgconfig:
+#	    export PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH
+	if [ x$(on_mac_os) = xyes ]; then
+	  extra_pkgconf=""
+	  export compiler="CC=clang"
+	else
+	  export compiler=""
+	  extra_pkgconf="--with-internal-glib"
+	fi
+	export CFLAGS="-std=$(std_c_old) $$CFLAGS"
+	$(call gbuild, pkg-config-$(pkgconfig-version), static, \
+		$$compiler $$extra_pkgconf \
+		--with-pc-path=$(ildir)/pkgconfig, V=1)
+	echo "pkg-config $(pkgconfig-version)" > $@
 
 
 
@@ -408,7 +466,10 @@ $(ibidir)/patchelf-$(patchelf-version): $(ibidir)/tar-$(tar-version)
 # function (for tilde expansion). The first can be disabled with
 # '--disable-load', but unfortunately I don't know any way to fix the
 # second. So, we'll have to build it dynamically for now.
-$(ibidir)/ncurses-$(ncurses-version): $(ibidir)/patchelf-$(patchelf-version)
+$(ibidir)/ncurses-$(ncurses-version): $(ibidir)/patchelf-$(patchelf-version) \
+                                      $(ibidir)/pkg-config-$(pkgconfig-version)
+
+#	Prepare the input.
 	tarball=ncurses-$(ncurses-version).tar.lz
 	$(call import-source, $(ncurses-url), $(ncurses-checksum))
 
@@ -424,12 +485,18 @@ $(ibidir)/ncurses-$(ncurses-version): $(ibidir)/patchelf-$(patchelf-version)
 	rm -f $(ibdir)/bash* $(ibdir)/awk* $(ibdir)/gawk*
 
 #	Standard build process.
-	export CFLAGS="-std=gnu17 $$CFLAGS"
+	export CFLAGS="-std=$(std_c_old) $$CFLAGS"
 	$(call gbuild, ncurses-$(ncurses-version), static, \
-	               --with-shared --enable-rpath --without-normal \
-	               --without-debug --with-cxx-binding \
-	               --with-cxx-shared --enable-widec --enable-pc-files \
-	               --with-pkg-config=$(ildir)/pkgconfig, -j$(numthreads))
+	               --with-shared \
+	               --enable-rpath \
+	               --enable-widec \
+	               --without-debug \
+	               --without-normal \
+	               --enable-pc-files \
+	               --with-cxx-shared \
+	               --with-cxx-binding \
+	               --with-pkg-config=$(ildir)/pkgconfig, \
+	               -j$(numthreads))
 
 #	Unfortunately there are many problems with 'ncurses' using "normal"
 #	(or 8-bit) characters. The standard way that will work is to build
@@ -567,7 +634,7 @@ $(ibidir)/bash-$(bash-version): \
 	export CFLAGS="$$CFLAGS \
 	               -DDEFAULT_PATH_VALUE='\"$(ibdir)\"' \
 	               -DSTANDARD_UTILS_PATH='\"$(ibdir)\"'  \
-	               -DSYS_BASHRC='\"$(BASH_ENV)\"' "
+	               -DSYS_BASHRC='\"$(BASH_ENV)\"'"
 	$(call gbuild, bash-$(bash-version),, $$stopt \
 	               --with-installed-readline=$(ildir) \
 	               --with-curses=yes, \
@@ -584,11 +651,9 @@ $(ibidir)/bash-$(bash-version): \
 #	shell. By convention, 'sh' is just a symbolic link to the preferred
 #	shell executable. So we'll define '$(ibdir)/sh' as a symbolic link
 #	to the Bash that we just built and installed.
-#
-#	Just to be sure that the installation step above went well, before
-#	making the link, we'll see if the file actually exists there.
 	ln -fs $(ibdir)/bash $(ibdir)/sh
 	echo "GNU Bash $(bash-version)" > $@
+
 
 
 
@@ -612,15 +677,21 @@ perl-conflddlflags =
 else
 perl-conflddlflags = -Dlddlflags="-shared $$LDFLAGS"
 endif
-$(ibidir)/perl-$(perl-version): $(ibidir)/patchelf-$(patchelf-version)
+$(ibidir)/perl-$(perl-version): $(ibidir)/tar-$(tar-version)
+
+#	Import tarball.
 	tarball=perl-$(perl-version).tar.lz
 	$(call import-source, $(perl-url), $(perl-checksum))
+
+#	Extract the version strings.
 	major_version=$$(echo $(perl-version) \
 	                     | sed -e's/\./ /g' \
 	                     | awk '{printf("%d", $$1)}')
 	base_version=$$(echo $(perl-version) \
 	                     | sed -e's/\./ /g' \
 	                     | awk '{printf("%d.%d", $$1, $$2)}')
+
+#	Unpack, build and install.
 	cd $(ddir)
 	rm -rf perl-$(perl-version)
 	tar -xf $(tdir)/$$tarball --no-same-owner --no-same-permissions
@@ -631,15 +702,15 @@ $(ibidir)/perl-$(perl-version): $(ibidir)/patchelf-$(patchelf-version)
 	            -Duseshrplib \
 	            -Dprefix=$(idir) \
 	            -Dvendorprefix=$(idir) \
-	            -Dprivlib=$(idir)/share/perl$$major_version/core_perl \
-	            -Darchlib=$(idir)/lib/perl$$major_version/$$base_version/core_perl \
-	            -Dsitelib=$(idir)/share/perl$$major_version/site_perl \
-	            -Dsitearch=$(idir)/lib/perl$$major_version/$$base_version/site_perl \
-	            -Dvendorlib=$(idir)/share/perl$$major_version/vendor_perl \
-	            -Dvendorarch=$(idir)/lib/perl$$major_version/$$base_version/vendor_perl \
-	            -Dscriptdir=$(idir)/bin/core_perl \
-	            -Dsitescript=$(idir)/bin/site_perl \
-	            -Dvendorscript=$(idir)/bin/vendor_perl \
+	            -Dprivlib=$(idir)/share/perl$$major_version/perl-core \
+	            -Darchlib=$(idir)/lib/perl$$major_version/$$base_version/perl-core \
+	            -Dsitelib=$(idir)/share/perl$$major_version/perl-site \
+	            -Dsitearch=$(idir)/lib/perl$$major_version/$$base_version/perl-site \
+	            -Dvendorlib=$(idir)/share/perl$$major_version/perl-vendor \
+	            -Dvendorarch=$(idir)/lib/perl$$major_version/$$base_version/perl-vendor \
+	            -Dscriptdir=$(idir)/bin/perl-core \
+	            -Dsitescript=$(idir)/bin/perl-site \
+	            -Dvendorscript=$(idir)/bin/perl-vendor \
 	            -Dinc_version_list=none \
 	            -Dman1ext=1perl \
 	            -Dman3ext=3perl \
@@ -650,7 +721,14 @@ $(ibidir)/perl-$(perl-version): $(ibidir)/patchelf-$(patchelf-version)
 	make install
 	cd ..
 	rm -rf perl-$(perl-version)
-	cd $$topdir
+
+#	Symbolic links to necessary Perl programs (that Perl installs in
+#	the 'perl-core' directory.
+	ln -sf $(ibdir)/perl-core/xsubpp $(ibdir)/xsubpp
+	ln -sf $(ibdir)/perl-core/pod2man $(ibdir)/pod2man
+	ln -sf $(ibdir)/perl-core/pod2text $(ibdir)/pod2text
+
+#	Final target.
 	echo "Perl $(perl-version)" > $@
 
 
@@ -719,29 +797,6 @@ $(ibidir)/coreutils-$(coreutils-version): \
 	rm -rf coreutils-$(coreutils-version)
 	echo "GNU Coreutils $(coreutils-version)" > $@
 
-# Podlators
-#
-# POD is short for "Plain Old Documentation", that is the format used in
-# Perl's documentation. Podlators provies two executables pod2man and
-# pod2text convert this into the roff format (used in man pages) or pod2 It
-# is used by some software like OpenSSL to create their man pages.
-$(ibidir)/podlators-$(podlators-version): $(ibidir)/perl-$(perl-version)
-	tarball=podlators-$(podlators-version).tar.lz
-	$(call import-source, $(podlators-url), $(podlators-checksum))
-	cd $(ddir)
-	rm -rf podlators-$(podlators-version)
-	tar -xf $(tdir)/$$tarball --no-same-owner --no-same-permissions
-	cd podlators-$(podlators-version)
-	$(shsrcdir)/prep-source.sh $(ibdir)
-	perl Makefile.PL
-	make
-	make install
-	ln -sf $(ibdir)/site_perl/pod2man $(ibdir)/pod2man
-	ln -sf $(ibdir)/site_perl/pod2text $(ibdir)/pod2text
-	cd ..
-	rm -rf podlators-$(podlators-version)
-	echo "podlators $(podlators-version)" > $@
-
 # OpenSSL
 #
 # Until we find a nice and generic way to create an updated CA file in the
@@ -749,8 +804,9 @@ $(ibidir)/podlators-$(podlators-version): $(ibidir)/perl-$(perl-version)
 # along with the other tarballs.
 $(idir)/etc:; mkdir $@
 $(idir)/etc/ssl: | $(idir)/etc; mkdir $@
-$(ibidir)/openssl-$(openssl-version): $(ibidir)/podlators-$(podlators-version) \
-                  | $(idir)/etc/ssl
+$(ibidir)/openssl-$(openssl-version): $(ibidir)/perl-$(perl-version) \
+                                      $(ibidir)/patchelf-$(patchelf-version) \
+                                      | $(idir)/etc/ssl
 
 #	First download the certificates and copy them into the
 #	installation directory.
@@ -906,7 +962,7 @@ $(ibidir)/diffutils-$(diffutils-version): \
 	echo "GNU Diffutils $(diffutils-version)" > $@
 
 $(ibidir)/file-$(file-version): $(ibidir)/coreutils-$(coreutils-version)
-	export CFLAGS="-std=c99 $$CFLAGS"
+	export CFLAGS="-std=$(std_c_old) $$CFLAGS"
 	tarball=file-$(file-version).tar.lz
 	$(call import-source, $(file-url), $(file-checksum))
 	$(call gbuild, file-$(file-version), static, \
@@ -958,6 +1014,8 @@ $(ibidir)/help2man-$(help2man-version): \
 	$(call gbuild, help2man-$(help2man-version), static, ,V=1)
 	echo "Help2man $(Help2man-version)" > $@
 
+# Even though libiconv does not use pkg-config, pkg-config conflicts with
+# it, see the comments in pkg-config for more.
 $(ibidir)/libiconv-$(libiconv-version): \
                    $(ibidir)/pkg-config-$(pkgconfig-version)
 	tarball=libiconv-$(libiconv-version).tar.lz
@@ -973,12 +1031,14 @@ $(ibidir)/libunistring-$(libunistring-version): \
 	               -j$(numthreads))
 	echo "GNU libunistring $(libunistring-version)" > $@
 
-$(ibidir)/libxml2-$(libxml2-version): $(ibidir)/patchelf-$(patchelf-version)
+$(ibidir)/libxml2-$(libxml2-version): $(ibidir)/tar-$(tar-version)
 #	The libxml2 tarball also contains Python bindings which are built
 #	and installed to a system directory by default. If you don't need
 #	the Python bindings, the easiest solution is to compile without
 #	Python support: './configure --without-python'. If you really need
-#	the Python bindings, use '--with-python-install-dir=DIR' instead.
+#	its Python bindings:
+#	  1. Add the Python dependency.
+#	  2. Add the '--with-python-install-dir=DIR' configure option.
 	tarball=libxml2-$(libxml2-version).tar.lz
 	$(call import-source, $(libxml2-url), $(libxml2-checksum))
 	$(call gbuild, libxml2-$(libxml2-version), static, \
@@ -1017,7 +1077,7 @@ $(ibidir)/gmp-$(gmp-version): \
               $(ibidir)/coreutils-$(coreutils-version)
 	tarball=gmp-$(gmp-version).tar.lz
 	$(call import-source, $(gmp-url), $(gmp-checksum))
-	export CFLAGS="-std=gnu17 $$CFLAGS"
+	export CFLAGS="-std=$(std_c_old) $$CFLAGS"
 	$(call gbuild, gmp-$(gmp-version), static, \
 	               --enable-cxx --enable-fat, \
 	               -j$(numthreads))
@@ -1084,33 +1144,6 @@ $(ibidir)/mpfr-$(mpfr-version): $(ibidir)/gmp-$(gmp-version)
 	$(call import-source, $(mpfr-url), $(mpfr-checksum))
 	$(call gbuild, mpfr-$(mpfr-version), static)
 	echo "GNU Multiple Precision Floating-Point Reliably $(mpfr-version)" > $@
-
-$(ibidir)/pkg-config-$(pkgconfig-version): $(ibidir)/patchelf-$(patchelf-version)
-
-#	Download the tarball.
-	tarball=pkg-config-$(pkgconfig-version).tar.lz
-	$(call import-source, $(pkgconfig-url), $(pkgconfig-checksum))
-
-#	An existing 'libiconv' can cause a conflict with 'pkg-config', this
-#	is why 'libiconv' depends on 'pkg-config'. On a clean build,
-#	'pkg-config' is built first. But when we don't have a clean build
-#	(and 'libiconv' exists) there will be a problem. So before
-#	re-building 'pkg-config', we'll remove any installation of
-#	'libiconv'.
-	rm -f $(ildir)/libiconv* $(idir)/include/iconv.h
-
-#	Some Mac OS systems may have a version of the GNU C Compiler (GCC)
-#	installed that doesn't support some necessary features of building
-#	Glib (as part of pkg-config). So to be safe, for Mac systems, we'll
-#	make sure it will use LLVM's Clang.
-	if [ x$(on_mac_os) = xyes ]; then export compiler="CC=clang"
-	else                              export compiler=""
-	fi
-	export CFLAGS="-std=gnu17 $$CFLAGS"
-	$(call gbuild, pkg-config-$(pkgconfig-version), static, \
-	               $$compiler --with-internal-glib \
-	               --with-pc-path=$(ildir)/pkgconfig, V=1)
-	echo "pkg-config $(pkgconfig-version)" > $@
 
 $(ibidir)/sed-$(sed-version): $(ibidir)/coreutils-$(coreutils-version)
 	tarball=sed-$(sed-version).tar.lz
@@ -1219,6 +1252,7 @@ $(ibidir)/binutils-$(binutils-version): \
 	  $(call makelink,ld)
 	  $(call makelink,nm)
 	  $(call makelink,ps)
+	  $(call makelink,lipo)
 	  $(call makelink,strip)
 	  $(call makelink,ranlib)
 	  echo "" > $@
@@ -1441,6 +1475,14 @@ $(ibidir)/gcc-$(gcc-version): $(ibidir)/binutils-$(binutils-version)
 	      -e"s|FS_IOC_SETFLAGS;|_IOW('f', 2, long);|" \
 	      -e"s|FS_IOC_SETVERSION;|_IOW('v', 2, long);|" \
 	      -i libsanitizer/sanitizer_common/sanitizer_platform_limits_posix.cpp
+
+#	  Bug in GCC 15.2.0 using glibc 2.43 (see [1]) as fixed in [2].
+#	  [1] https://patchwork.ozlabs.org/project/gcc/patch/e1679277-d7c9-49aa-8365-a8dca082d9bd@web.de
+#	  [2] https://github.com/johnny-mnemonic/toolchain-autobuilds/commit/9585fdfc
+	  sed -e's|char \*q = strchr (p + 1,|const char \*q = strchr (p + 1,|' \
+	      libgomp/affinity-fmt.c > affinity-fmt-tmp.c
+	  mv affinity-fmt-tmp.c libgomp/affinity-fmt.c
+
 
 #	  Set the build directory for the processing.
 	  mkdir build

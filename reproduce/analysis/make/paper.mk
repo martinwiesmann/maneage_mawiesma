@@ -19,6 +19,21 @@
 
 
 
+# Software info in TeX
+# --------------------
+#
+# The information of the installed software is placed in the
+# '.build/software' directory (which the TeX build should not depend
+# on). Therefore, we should copy those macros here in the LaTeX build
+# directory, so the TeX directory is completely independent from each
+# other.
+$(mtexdir)/dependencies.tex: $(bsdir)/config/dependencies.tex
+	cp $(bsdir)/config/*.tex $(mtexdir)/
+
+
+
+
+
 # LaTeX macros for paper
 # ----------------------
 #
@@ -40,19 +55,36 @@
 # Note that if you don't want the final PDF and just want the processing
 # and file outputs, you can give any value other than 'yes' to
 # 'pdf-build-final' in 'reproduce/analysis/config/pdf-build.conf'.
-$(mtexdir)/project.tex: $(mtexdir)/verify.tex
+$(mtexdir)/project.tex: $(mtexdir)/verify.tex $(mtexdir)/dependencies.tex
 
 #	If no PDF is requested, or if LaTeX isn't available, don't continue
 #	to building the final PDF. Otherwise, merge all the TeX macros into
 #	one for building the PDF.
-	@if [ -f .local/bin/pdflatex ] && [ x"$(pdf-build-final)" = xyes ]; then
+	@if [ -f .local/bin/pdflatex ] && [ x"$(pdf-build-final)" = xyes ];
+	  then
 
 #	  Put a LaTeX input command for all the necessary macro files.
-#	  'hardware-parameters.tex' is created in 'configure.sh'.
+#	  Note that 'hardware-parameters.tex' is created in 'configure.sh'
+#	  (which is why it is first in the list).
 	  projecttex=$(mtexdir)/project.tex
 	  rm -f $$projecttex
-	  for t in $(subst paper,,$(makesrc)) hardware-parameters; do
-	    echo "\input{tex/build/macros/$$t.tex}" >> $$projecttex
+	  for t in hardware-parameters $(subst paper,,$(makesrc)); do
+
+#	    Only add the macro file to 'project.tex' if the macro file is
+#	    not empty. Empty macro files are not a bug in Maneage alone: 1)
+#	    the processing of a sub-Makefile may not need to produce any
+#	    written macro for the PDF, and that is perfectly fine. 2) LaTeX
+#	    can also '\input' an empty file. However, it is important for
+#	    for publication servers (like arXiv) that do not allow
+#	    uploading empty files. Therefore, when 'project.tex' contains
+#	    empty files, such severs will not be able compile the PDF
+#	    because the file name is mentioned in 'project.tex', but cannot
+#	    be found in the uploaded files.
+	    tfile=tex/build/macros/$$t.tex
+	    if [ -s $$tfile ]; then
+	      echo "\input{$$tfile}" >> $$projecttex
+	    fi
+
 	  done
 
 #	  Possibly highlight the '\new' parts of the text.
@@ -110,21 +142,6 @@ tikzdir:=$(texbdir)/tikz
 
 
 
-# Software info in TeX
-# --------------------
-#
-# The information of the installed software is placed in the
-# '.build/software' directory (which the TeX build should not depend
-# on). Therefore, we should copy those macros here in the LaTeX build
-# directory, so the TeX directory is completely independent from each
-# other.
-$(mtexdir)/dependencies.tex: $(bsdir)/config/dependencies.tex
-	cp $(bsdir)/config/*.tex $(mtexdir)/
-
-
-
-
-
 # The bibliography
 # ----------------
 #
@@ -137,8 +154,7 @@ $(mtexdir)/dependencies.tex: $(bsdir)/config/dependencies.tex
 # recipe and the 'paper.pdf' recipe. But if 'tex/src/references.tex' hasn't
 # been modified, we don't want to re-build the bibliography, only the final
 # PDF.
-$(texbdir)/paper.bbl: tex/src/references.tex $(mtexdir)/dependencies.tex \
-                      | $(mtexdir)/project.tex
+$(texbdir)/paper.bbl: tex/src/references.tex | $(mtexdir)/project.tex
 
 #	If '$(mtexdir)/project.tex' is empty, don't build PDF.
 	@macros=$$(cat $(mtexdir)/project.tex)

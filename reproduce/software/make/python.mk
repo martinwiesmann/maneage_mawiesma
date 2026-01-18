@@ -83,7 +83,11 @@ $(ibidir)/libffi-$(libffi-version):
 	fi
 	echo "Libffi $(libffi-version)" > $@
 
-$(ibidir)/python-$(python-version): $(ibidir)/libffi-$(libffi-version)
+# 2025-05-26 '--with-system-ffi' seems to be obsolete
+# TODO: For a recommended list of dependencies, see
+#  https://github.com/pyenv/pyenv/wiki#suggested-build-environment
+$(ibidir)/python-$(python-version): $(ibidir)/libffi-$(libffi-version) \
+                                    $(ibidir)/sqlite-$(sqlite-version)
 
 #	Download the source.
 	tarball=python-$(python-version).tar.lz
@@ -346,11 +350,26 @@ $(ipydir)/astropy-$(astropy-version): \
 	rm -fv $(idir)/bin/fits{diff,check,header,info,2bitmap}
 	rm -fv $(idir)/bin/{samp_hub,showtable,volint,wcslint}
 
+#	Uncomment the 'export' command below only when building from a git
+#	tarball, e.g. for testing if a bug still occurs:
+#	export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_ASTROPY=7.2.0.87
+
 #	Do the basic build.
 	$(call pybuild, tar -xf, astropy-$(astropy-version),,, \
 	                GPEP517)
 	cp -pv $(dtexdir)/astropy.tex $(ictdir)/
 	echo "Astropy $(astropy-version) \citep{astropy2013,astropy2018}" > $@
+
+$(ipydir)/astropy-healpix-$(astropy-healpix-version): \
+                       $(ipydir)/extension-helpers-$(extension-helpers-version) \
+                       $(ipydir)/numpy-$(numpy-version)
+	tarball=astropy-healpix-$(astropy-healpix-version).tar.lz
+	$(call import-source, $(astropy-healpix-url), \
+	         $(astropy-healpix-checksum))
+	$(call pybuild, tar -xf, \
+	                astropy-healpix-$(astropy-healpix-version),,, \
+	                GPEP517)
+	echo "Astropy-healpix $(astropy-healpix-version)" > $@
 
 $(ipydir)/astropy-iers-data-$(astropy-iers-data-version): \
                             $(ipydir)/setuptools-$(setuptools-version)
@@ -360,7 +379,7 @@ $(ipydir)/astropy-iers-data-$(astropy-iers-data-version): \
 	$(call pybuild, tar -xf, \
 	                astropy-iers-data-$(astropy-iers-data-version),,, \
 	                GPEP517)
-	echo "Astropy-Iers-Data $(astropy-iers-data-version)" > $@
+	echo "Astropy-IERS-data $(astropy-iers-data-version)" > $@
 
 $(ipydir)/beautifulsoup4-$(beautifulsoup4-version): \
                          $(ipydir)/soupsieve-$(soupsieve-version)
@@ -400,6 +419,13 @@ $(ipydir)/chardet-$(chardet-version): \
 	$(call pybuild, tar -xf, chardet-$(chardet-version), , \
 	                Chardet $(chardet-version))
 
+$(ipydir)/colorama-$(colorama-version): \
+                  $(ipydir)/hatchling-$(hatchling-version)
+	tarball=colorama-$(colorama-version).tar.lz
+	$(call import-source, $(colorama-url), $(colorama-checksum))
+	$(call pybuild, tar -xf, \
+	            colorama-$(colorama-version),,, GPEP517)
+
 $(ipydir)/contourpy-$(contourpy-version): \
                      $(ipydir)/pybind11-$(pybind11-version) \
                      $(ipydir)/meson-python-$(meson-python-version)
@@ -416,6 +442,15 @@ $(ipydir)/corner-$(corner-version): $(ipydir)/matplotlib-$(matplotlib-version)
 	                Corner $(corner-version))
 	cp $(dtexdir)/corner.tex $(ictdir)/
 	echo "Corner $(corner-version) \citep{corner}" > $@
+
+$(ipydir)/cosmodesi-mpytools-$(cosmodesi-mpytools-version): \
+                    $(ipydir)/numpy-$(numpy-version) \
+                    $(ipydir)/scipy-$(scipy-version)
+	tarball=cosmodesi-mpytools-$(cosmodesi-mpytools-version).tar.lz
+	$(call import-source, $(cosmodesi-mpytools-url), $(cosmodesi-mpytools-checksum))
+	$(call pybuild, tar -xf, cosmodesi-mpytools-$(cosmodesi-mpytools-version), , \
+	                Cosmodesi-mpytools $(cosmodesi-mpytools-version), GPEP517)
+	echo "Cosmodesi-mpytools $(cosmodesi-mpytools-version)" > $@
 
 $(ipydir)/cppy-$(cppy-version): \
                $(ipydir)/setuptools-scm-$(setuptools-scm-version)
@@ -482,6 +517,15 @@ $(ipydir)/entrypoints-$(entrypoints-version): \
 	$(call pybuild, tar -xf, entrypoints-$(entrypoints-version), , \
 	                EntryPoints $(entrypoints-version))
 
+$(ipydir)/exceptiongroup-$(exceptiongroup-version): \
+	   $(ipydir)/setuptools-$(setuptools-version) \
+           $(ipydir)/flit-scm-$(flit-scm-version)
+	tarball=exceptiongroup-$(exceptiongroup-version).tar.lz
+	$(call import-source, $(exceptiongroup-url), $(exceptiongroup-checksum))
+	$(call pybuild, tar -xf, exceptiongroup-$(exceptiongroup-version), , \
+	                Exceptiongroup $(exceptiongroup-version), GPEP517)
+
+
 $(ipydir)/extension-helpers-$(extension-helpers-version): \
                     $(ipydir)/setuptools-scm-$(setuptools-scm-version)
 	tarball=extension-helpers-$(extension-helpers-version).tar.lz
@@ -506,6 +550,16 @@ $(ipydir)/flit-core-$(flit-core-version): \
 	$(call import-source, $(flit-core-url), $(flit-core-checksum))
 	$(call pybuild, tar -xf, flit-core-$(flit-core-version), , \
 	                Flit-core $(flit-core-version), GPEP517)
+
+
+$(ipydir)/flit-scm-$(flit-scm-version): \
+                     $(ipydir)/flit-core-$(flit-core-version) \
+                     $(ipydir)/setuptools-scm-$(setuptools-scm-version)
+	tarball=flit-scm-$(flit-scm-version).tar.lz
+	$(call import-source, $(flit-scm-url), $(flit-scm-checksum))
+	$(call pybuild, tar -xf, flit-scm-$(flit-scm-version), , \
+	                flit-scm $(flit-scm-version), GPEP517)
+
 
 # Although cython is not an obligatory prerequisite of fonttools, we force
 # it as a prerequisite for reproducibility; otherwise build parallelism may
@@ -558,6 +612,23 @@ $(ipydir)/gpep517-$(gpep517-version): \
 	                BOOT_GPEP517)
 	echo "gpep517 $(gpep517-version)" > $@
 
+$(ipydir)/hatchling-$(hatchling-version): \
+                  $(ipydir)/packaging-$(packaging-version) \
+                  $(ipydir)/pathspec-$(pathspec-version) \
+                  $(ipydir)/pluggy-$(pluggy-version) \
+                  $(ipydir)/trove-classifiers-$(trove-classifiers-version)
+	tarball=hatchling-$(hatchling-version).tar.lz
+	$(call import-source, $(hatchling-url), $(hatchling-checksum))
+	$(call pybuild, tar -xf, \
+	            hatchling-$(hatchling-version),,, GPEP517)
+
+$(ipydir)/hatch-vcs-$(hatch-vcs-version): \
+	   $(ipydir)/hatchling-$(hatchling-version)
+	tarball=hatch-vcs-$(hatch-vcs-version).tar.lz
+	$(call import-source, $(hatch-vcs-url), $(hatch-vcs-checksum))
+	$(call pybuild, tar -xf, hatch-vcs-$(hatch-vcs-version), , \
+	                Hatch-vcs $(hatch-vcs-version), GPEP517)
+
 $(ipydir)/h5py-$(h5py-version): \
                $(ipydir)/six-$(six-version) \
                $(ibidir)/hdf5-$(hdf5-version) \
@@ -572,15 +643,38 @@ $(ipydir)/h5py-$(h5py-version): \
 	$(call pybuild, tar -xf, h5py-$(h5py-version), , \
 	                h5py $(h5py-version))
 
-# 'healpy' is actually installed as part of the HEALPix package. It will be
-# installed with its C/C++ libraries if any other Python library is
-# requested with HEALPix. So actually calling for 'healpix' (when 'healpix'
-# is requested) is not necessary. But some users might not know about this
-# and just ask for 'healpy'. To avoid confusion in such cases, we'll just
-# set 'healpy' to be dependent on 'healpix' and not download any tarball
-# for it, or write anything in the final target.
-$(ipydir)/healpy-$(healpy-version): $(ibidir)/healpix-$(healpix-version)
-	touch $@
+# As of 2025-05-20, there are at least three python healpix packages at
+# pypi.org, with versions:
+#
+# https://pypi.org/project/healpy  1.18.1
+# https://pypi.org/project/healpix 2024.2
+# https://pypi.org/project/astropy-healpix 1.1.2
+#
+# Maneage provides both 'healpy' and 'astropy-healpix', independently. We
+# ignore pypix 'healpix', whose name risks confusion with the C/C++/fortran
+# version of healpix.
+#
+# For simplicity and error tracing, you should best install either healpy
+# or astropy-healpix, not both. For example, astropy_healpix/healpy.py has
+# an interface to provide 'healpy' type function names. However, it may be
+# possible to use both if your python imports avoid namespace clashes.  See
+# the documentation and source code of the respective packages to study how
+# they relate to one another.
+#
+# The 'healpy' package requires the C/C++ 'healpix' package to be built
+# in order to use the shared 'libsharp' library.
+$(ipydir)/healpy-$(healpy-version): \
+                       $(ibidir)/healpix-$(healpix-version) \
+                       $(ipydir)/matplotlib-$(matplotlib-version) \
+                       $(ipydir)/scipy-$(scipy-version)
+	tarball=healpy-$(healpy-version).tar.lz
+	$(call import-source, $(healpy-url), \
+	         $(healpy-checksum))
+	$(call pybuild, tar -xf, \
+	                healpy-$(healpy-version),,, \
+	                GPEP517)
+	echo "Healpy $(healpy-version)" > $@
+
 
 $(ipydir)/html5lib-$(html5lib-version): \
                    $(ipydir)/six-$(six-version) \
@@ -612,6 +706,13 @@ $(ipydir)/jinja2-$(jinja2-version): $(ipydir)/markupsafe-$(markupsafe-version)
 	$(call pybuild, tar -xf, jinja2-$(jinja2-version), , \
 	                Jinja2 $(jinja2-version))
 
+$(ipydir)/joblib-$(joblib-version): \
+                  $(ipydir)/setuptools-$(setuptools-version)
+	tarball=joblib-$(joblib-version).tar.lz
+	$(call import-source, $(joblib-url), $(joblib-checksum))
+	$(call pybuild, tar -xf, \
+	            joblib-$(joblib-version),,, GPEP517)
+
 $(ipydir)/keyring-$(keyring-version): \
                   $(ipydir)/entrypoints-$(entrypoints-version) \
                   $(ipydir)/secretstorage-$(secretstorage-version) \
@@ -631,6 +732,48 @@ $(ipydir)/kiwisolver-$(kiwisolver-version): \
 	cp -pv $(dtexdir)/kiwisolver.tex $(ictdir)/
 	echo "Kiwisolver $(kiwisolver-version) \citep{cassowary2001}" > $@
 
+# 2025-05-21: As of Feb 2025, it appears the lscsoft group is not maintaining
+# python-ligo-lw and ligo-segments; the LIGO Computing Group forked these
+# to igwn-ligolw and igwn-segments, respectively [1].
+# [1] https://github.com/ahnitz/ligo-segments/issues/1
+$(ipydir)/igwn-segments-$(igwn-segments-version): \
+                         $(ipydir)/setuptools-$(setuptools-version)
+	tarball=igwn-segments-$(igwn-segments-version).tar.lz
+	$(call import-source, $(igwn-segments-url), $(igwn-segments-checksum))
+	$(call pybuild, tar -xf, \
+	            igwn-segments-$(igwn-segments-version),, \
+	            Igwn-segments $(igwn-segments-version), GPEP517)
+
+
+$(ipydir)/iniconfig-$(iniconfig-version): \
+	   $(ipydir)/hatch-vcs-$(hatch-vcs-version)
+	tarball=iniconfig-$(iniconfig-version).tar.lz
+	$(call import-source, $(iniconfig-url), $(iniconfig-checksum))
+	$(call pybuild, tar -xf, iniconfig-$(iniconfig-version), , \
+	                Iniconfig $(iniconfig-version), GPEP517)
+
+# Upstream this is called ligo.skymap with a full stop '.'; we replace it
+# by a hyphen '-' to reduce the chance of regex errors.
+#
+# 2025-05-19 Warning: this might have some undetected dependencies.
+$(ipydir)/ligo-skymap-$(ligo-skymap-version): \
+                       $(ibidir)/gsl-$(gsl-version) \
+                       $(ipydir)/tqdm-$(tqdm-version) \
+                       $(ibidir)/sqlite-$(sqlite3-version) \
+                       $(ipydir)/astropy-$(astropy-version) \
+                       $(ipydir)/lalsuite-$(lalsuite-version) \
+                       $(ipydir)/igwn-ligolw-$(igwn-ligolw-version) \
+                       $(ipydir)/igwn-segments-$(igwn-segments-version) \
+                       $(ipydir)/astropy-healpix-$(astropy-healpix-version)
+	tarball=ligo-skymap-$(ligo-skymap-version).tar.lz
+	$(call import-source, $(ligo-skymap-url), \
+	         $(ligo-skymap-checksum))
+	$(call pybuild, tar -xf, \
+	                ligo-skymap-$(ligo-skymap-version),,, \
+	                GPEP517)
+	echo "ligo-skymap $(ligo-skymap-version)" > $@
+
+
 $(ipydir)/lmfit-$(lmfit-version): \
                 $(ipydir)/six-$(six-version) \
                 $(ipydir)/scipy-$(scipy-version) \
@@ -643,6 +786,14 @@ $(ipydir)/lmfit-$(lmfit-version): \
 	$(call import-source, $(lmfit-url), $(lmfit-checksum))
 	$(call pybuild, tar -xf, lmfit-$(lmfit-version), , \
 	                LMFIT $(lmfit-version))
+
+$(ipydir)/lscsoft-glue-$(lscsoft-glue-version): \
+                    $(ipydir)/gpep517-$(gpep517-version) \
+                    $(ipydir)/python-installer-$(python-installer-version)
+	tarball=lscsoft-glue-$(lscsoft-glue-version).tar.lz
+	$(call import-source, $(lscsoft-glue-url), $(lscsoft-glue-checksum))
+	$(call pybuild, tar -xf, \
+	            lscsoft-glue-$(lscsoft-glue-version),,, GPEP517)
 
 $(ipydir)/lsstdesccoord-$(lsstdesccoord-version): \
                         $(ipydir)/cffi-$(cffi-version) \
@@ -661,11 +812,19 @@ $(ipydir)/markupsafe-$(markupsafe-version): \
 	$(call pybuild, tar -xf, markupsafe-$(markupsafe-version), , \
 	                MarkupSafe $(markupsafe-version))
 
+# As of 2026-04-19: Matplotlib needs internet to download and build its
+# custom versions of 'freetype' and 'qhull'. The proposed option to 'python
+# -m pip instsall' in [1] for using system libraries was tested, but did
+# not work in this setup (our 'pybuild' uses 'python -m gpep517
+# install-from-source', not 'pip').
+#
+# [1] https://matplotlib.org/stable/install/dependencies.html
 $(ipydir)/matplotlib-$(matplotlib-version): \
                      $(itidir)/texlive \
                      $(ipydir)/numpy-$(numpy-version) \
                      $(ipydir)/cycler-$(cycler-version) \
                      $(ipydir)/pillow-$(pillow-version) \
+                     $(ibidir)/freetype-$(freetype-version) \
                      $(ipydir)/fonttools-$(fonttools-version) \
                      $(ipydir)/contourpy-$(contourpy-version) \
                      $(ipydir)/kiwisolver-$(kiwisolver-version) \
@@ -706,12 +865,11 @@ $(ipydir)/meson-python-$(meson-python-version): \
 	echo "Meson-Python $(meson-python-version)" > $@
 
 $(ipydir)/mpi4py-$(mpi4py-version): \
-                 $(ipydir)/gpep517-$(gpep517-version) \
                  $(ibidir)/openmpi-$(openmpi-version) \
-                 $(ipydir)/python-installer-$(python-installer-version)
+                 $(ipydir)/cython-$(cython-version)
 	tarball=mpi4py-$(mpi4py-version).tar.lz
 	$(call import-source, $(mpi4py-url), $(mpi4py-checksum))
-	$(call pybuild, tar -xf, mpi4py-$(mpi4py-version))
+	$(call pybuild, tar -xf, mpi4py-$(mpi4py-version),,, GPEP517)
 	cp $(dtexdir)/mpi4py.tex $(ictdir)/
 	echo "mpi4py $(mpi4py-version) \citep{mpi4py2011}" > $@
 
@@ -723,8 +881,17 @@ $(ipydir)/mpmath-$(mpmath-version): \
 	$(call pybuild, tar -xf, mpmath-$(mpmath-version), , \
 	                mpmath $(mpmath-version))
 
-# Until 2025-02-22: we had 'export CFLAGS="--std=c99 $$CFLAGS"' before
-# calling pybuild; but that doesn't seem to be necessary.
+$(ipydir)/networkx-$(networkx-version): \
+                       $(ipydir)/setuptools-$(setuptools-version)
+	tarball=networkx-$(networkx-version).tar.lz
+	$(call import-source, $(networkx-url), $(networkx-checksum))
+	$(call pybuild, tar -xf, \
+	                networkx-$(networkx-version),,, \
+	                GPEP517)
+	echo "networkx $(networkx-version)" > $@
+
+# Numpy's MacOS builds using Xcode prior to 26.3 needed the following flags
+# added to 'LDFLAGS': '-undefined dynamic_lookup -bundle'.
 $(ipydir)/numpy-$(numpy-version): \
                 $(ipydir)/cython-$(cython-version) \
                 $(ibidir)/openblas-$(openblas-version) \
@@ -732,9 +899,6 @@ $(ipydir)/numpy-$(numpy-version): \
                 $(ipydir)/meson-python-$(meson-python-version)
 	tarball=numpy-$(numpy-version).tar.lz
 	$(call import-source, $(numpy-url), $(numpy-checksum))
-	if [ x$(on_mac_os) = xyes ]; then
-	  export LDFLAGS="$(LDFLAGS) -undefined dynamic_lookup -bundle"
-	fi
 	conf="$$(pwd)/reproduce/software/config/numpy-scipy.cfg"
 	$(call pybuild, tar -xf, numpy-$(numpy-version),$$conf, \
 	                Numpy $(numpy-version), GPEP517)
@@ -747,6 +911,23 @@ $(ipydir)/packaging-$(packaging-version): \
 	$(call import-source, $(packaging-url), $(packaging-checksum))
 	$(call pybuild, tar -xf, packaging-$(packaging-version), , \
 	                Packaging $(packaging-version), GPEP517)
+
+$(ipydir)/pandas-$(pandas-version): \
+                  $(ipydir)/numpy-$(numpy-version) \
+                  $(ipydir)/versioneer-$(versioneer-version) \
+                  $(ipydir)/pytz-$(pytz-version)
+	tarball=pandas-$(pandas-version).tar.lz
+	$(call import-source, $(pandas-url), $(pandas-checksum))
+	$(call pybuild, tar -xf, pandas-$(pandas-version), , \
+	                Pandas $(pandas-version), GPEP517)
+	echo "pandas $(pandas-version)" > $@
+
+$(ipydir)/pathspec-$(pathspec-version): \
+                  $(ipydir)/setuptools-$(setuptools-version)
+	tarball=pathspec-$(pathspec-version).tar.lz
+	$(call import-source, $(pathspec-url), $(pathspec-checksum))
+	$(call pybuild, tar -xf, \
+	            pathspec-$(pathspec-version),,, GPEP517)
 
 $(ipydir)/pexpect-$(pexpect-version): \
                   $(ipydir)/gpep517-$(gpep517-version) \
@@ -772,6 +953,13 @@ $(ipydir)/pillow-$(pillow-version): $(ibidir)/libjpeg-$(libjpeg-version) \
 # 	$(call import-source, $(pip-url), $(pip-checksum))
 # 	$(call pybuild, tar -xf, pip-$(pip-version), , \
 # 	                PiP $(pip-version))
+
+$(ipydir)/pluggy-$(pluggy-version): \
+                  $(ipydir)/setuptools-$(setuptools-version)
+	tarball=pluggy-$(pluggy-version).tar.lz
+	$(call import-source, $(pluggy-url), $(pluggy-checksum))
+	$(call pybuild, tar -xf, \
+	            pluggy-$(pluggy-version),,, GPEP517)
 
 $(ipydir)/ply-$(ply-version): \
               $(ipydir)/gpep517-$(gpep517-version) \
@@ -828,6 +1016,13 @@ $(ipydir)/pyflakes-$(pyflakes-version): \
 	$(call pybuild, tar -xf, pyflakes-$(pyflakes-version), , \
 	                pyflakes $(pyflakes-version))
 
+$(ipydir)/pygments-$(pygments-version): \
+	   $(ipydir)/hatchling-$(hatchling-version)
+	tarball=pygments-$(pygments-version).tar.lz
+	$(call import-source, $(pygments-url), $(pygments-checksum))
+	$(call pybuild, tar -xf, pygments-$(pygments-version), , \
+	                Pygments $(pygments-version), GPEP517)
+
 $(ipydir)/pyparsing-$(pyparsing-version): \
                     $(ipydir)/gpep517-$(gpep517-version) \
                     $(ipydir)/flit-core-$(flit-core-version) \
@@ -854,8 +1049,26 @@ $(ipydir)/pyproject-metadata-$(pyproject-metadata-version): \
 	$(call pybuild, tar -xf, \
 	            pyproject-metadata-$(pyproject-metadata-version),,, GPEP517)
 
+
+$(ipydir)/pytest-$(pytest-version): \
+                       $(ipydir)/setuptools-scm-$(setuptools-scm-version) \
+                       $(ipydir)/colorama-$(colorama-version) \
+                       $(ipydir)/exceptiongroup-$(exceptiongroup-version) \
+                       $(ipydir)/iniconfig-$(iniconfig-version) \
+                       $(ipydir)/packaging-$(packaging-version) \
+                       $(ipydir)/pluggy-$(pluggy-version) \
+                       $(ipydir)/pygments-$(pygments-version)
+	tarball=pytest-$(pytest-version).tar.lz
+	$(call import-source, $(pytest-url), $(pytest-checksum))
+	$(call pybuild, tar -xf, \
+	                pytest-$(pytest-version),,, \
+	                GPEP517)
+	echo "pytest $(pytest-version)" > $@
+
+
 $(ipydir)/python-dateutil-$(python-dateutil-version): \
-                          $(ipydir)/setuptools-scm-$(setuptools-scm-version)
+                          $(ipydir)/setuptools-scm-$(setuptools-scm-version) \
+                          $(ipydir)/six-$(six-version)
 	tarball=python-dateutil-$(python-dateutil-version).tar.lz
 	$(call import-source, $(python-dateutil-url), $(python-dateutil-checksum))
 	$(call pybuild, tar -xf, python-dateutil-$(python-dateutil-version), , \
@@ -885,6 +1098,37 @@ $(ipydir)/python-installer-$(python-installer-version): \
 	                BOOT_INSTALLER)
 	echo "Python-installer $(python-installer-version)" > $@
 
+# 2025-05-21: As of Feb 2025, it appears the lscsoft group is not maintaining
+# python-ligo-lw and ligo-segments; the LIGO Computing Group forked these
+# to igwn-ligolw and igwn-segments, respectively [1].
+# [1] https://github.com/ahnitz/ligo-segments/issues/1
+$(ipydir)/igwn-ligolw-$(igwn-ligolw-version): \
+                  $(ipydir)/setuptools-scm-$(setuptools-scm-version)
+	tarball=igwn-ligolw-$(igwn-ligolw-version).tar.lz
+	$(call import-source, $(igwn-ligolw-url), \
+	         $(igwn-ligolw-checksum))
+	$(call pybuild, tar -xf, \
+	                igwn-ligolw-$(igwn-ligolw-version),,, \
+	                GPEP517)
+	echo "igwn-ligolw $(igwn-ligolw-version)" > $@
+
+$(ipydir)/pyfftw-$(pyfftw-version): $(ipydir)/numpy-$(numpy-version) \
+	$(ibidir)/fftw-$(fftw-version)
+	tarball=pyfftw-$(pyfftw-version).tar.lz
+	$(call import-source, $(pyfftw-url), $(pyfftw-checksum))
+	$(call pybuild, tar -xf, pyfftw-$(pyfftw-version), , \
+	                Pyfftw $(pyfftw-version), GPEP517)
+
+
+# Called 'fitsio' in pypi.org: https://pypi.org/project/fitsio
+$(ipydir)/python3-fitsio-$(python3-fitsio-version): \
+                  $(ibidir)/patch-$(patch-version) \
+                  $(ipydir)/numpy-$(numpy-version)
+	tarball=python3-fitsio-$(python3-fitsio-version).tar.lz
+	$(call import-source, $(python3-fitsio-url), $(python3-fitsio-checksum))
+	$(call pybuild, tar -xf, python3-fitsio-$(python3-fitsio-version), , \
+	                Python3 Fitsio $(python3-fitsio-version), GPEP517)
+
 $(ipydir)/pythran-$(pythran-version): \
                   $(ipydir)/ply-$(ply-version) \
                   $(ipydir)/gast-$(gast-version) \
@@ -904,6 +1148,13 @@ $(ipydir)/pyyaml-$(pyyaml-version): \
 	$(call pybuild, tar -xf, pyyaml-$(pyyaml-version), , \
 	                PyYAML $(pyyaml-version), GPEP517)
 
+$(ipydir)/pytz-$(pytz-version): \
+                  $(ipydir)/setuptools-$(setuptools-version)
+	tarball=pytz-$(pytz-version).tar.lz
+	$(call import-source, $(pytz-url), $(pytz-checksum))
+	$(call pybuild, tar -xf, pytz-$(pytz-version), , \
+	                Pytz $(pytz-version), GPEP517)
+
 $(ipydir)/requests-$(requests-version): $(ipydir)/idna-$(idna-version) \
                    $(ipydir)/numpy-$(numpy-version) \
                    $(ipydir)/certifi-$(certifi-version) \
@@ -914,41 +1165,39 @@ $(ipydir)/requests-$(requests-version): $(ipydir)/idna-$(idna-version) \
 	$(call pybuild, tar -xf, requests-$(requests-version), , \
 	                Requests $(requests-version))
 
-# 'pythran' is disabled in the build of Scipy because of complications it
-# caused on some systems. We explicitly disable it using a preprocessor
-# directive. 'Pythran' can in principle speed up compilation of scientific
-# software [1][2].
+# Scipy building notes:
+#
+# 1. 'pythran' is disabled in the build of Scipy because of complications
+#    it caused on some systems. 'Pythran' can in principle speed up
+#    compilation of scientific software [1][2]. We explicitly disable it by
+#    modifying the source. Technically it should also be possible to pass
+#    the following option to the gpep517 build recipes with correct
+#    escaping of single and double quotes, but this has not tried as of
+#    2025-02-25.
+#        --config-json='{"setup-args":"-Duse-pythran=false"}'
+#
+# 2. Scipy's MacOS builds using Xcode prior to 26.3 needed the following
+#    flags added to 'LDFLAGS': '-undefined dynamic_lookup -bundle'.
+#
 # [1] https://pythran.readthedocs.io/en/latest
-# [2] https://docs.scipy.org/doc/scipy-1.15.2/dev/roadmap-detailed.html
+# [2] https://docs.scipy.org/doc/scipy-1.15.2/dev/roadmap-detailed.html#use-of-pythran
 $(ipydir)/scipy-$(scipy-version): \
                   $(ipydir)/numpy-$(numpy-version) \
                   $(ipydir)/pybind11-$(pybind11-version)
+
+#	Import the tarball.
 	tarball=scipy-$(scipy-version).tar.lz
 	$(call import-source, $(scipy-url), $(scipy-checksum))
-	if [ x$(on_mac_os) = xyes ]; then
-	  export LDFLAGS="$(LDFLAGS) -undefined dynamic_lookup -bundle"
-	else
-#	  Same question as for 'numpy': why '-shared'? This obstructs
-#	  the meson build.
-#	  export LDFLAGS="$(LDFLAGS) -shared"
-	  :
-	fi
-	conf="$$(pwd)/reproduce/software/config/numpy-scipy.cfg"
 
-#	Disable pythran: see
-#	https://docs.scipy.org/doc/scipy-1.15.2/dev/roadmap-detailed.html#use-of-pythran
-#	export SCIPY_USE_PYTHRAN=0 # deprecated(?)
-#	Option 1: Hack the source:
+#	Disable pythran (see above).
 	pyhook_before() {
 	   mv -iv meson.options meson.options.orig; \
 	   sed -e 's/\(use-pythran.*value: *\)true/\1false/' \
 	        meson.options.orig > meson.options
 	}
 
-#	Option 2: pass the string
-#	   --config-json='{"setup-args": "-Duse-pythran=false"}'
-#	to gpep517 with correct escaping of single and double quotes.
-#	Not tried as of 2025-02-25.
+#	Build Scipy.
+	conf="$$(pwd)/reproduce/software/config/numpy-scipy.cfg"
 	$(call pybuild, tar -xf, scipy-$(scipy-version),$$conf,, GPEP517)
 	cp $(dtexdir)/scipy.tex $(ictdir)/
 	echo "Scipy $(scipy-version) \citep{scipy2020}" > $@
@@ -1003,6 +1252,26 @@ $(ipydir)/sip_tpv-$(sip_tpv-version): \
 	cp $(dtexdir)/sip_tpv.tex $(ictdir)/
 	echo "sip_tpv $(sip_tpv-version) \citep{sip-tpv}" > $@
 
+$(ipydir)/scikit-base-$(scikit-base-version): \
+                     $(ipydir)/gpep517-$(gpep517-version) \
+                     $(ipydir)/python-installer-$(python-installer-version)
+	tarball=scikit-base-$(scikit-base-version).tar.lz
+	$(call import-source, $(scikit-base-url), $(scikit-base-checksum))
+	$(call pybuild, tar -xf, scikit-base-$(scikit-base-version), , \
+	                Scikit-base $(scikit-base-version), GPEP517)
+	echo "scikit-base $(scikit-base-version)" > $@
+
+$(ipydir)/scikit-learn-$(scikit-learn-version): \
+                  $(ipydir)/joblib-$(joblib-version) \
+                  $(ipydir)/threadpoolctl-$(threadpoolctl-version) \
+                  $(ipydir)/numpy-$(numpy-version) \
+                  $(ipydir)/scipy-$(scipy-version)
+	tarball=scikit-learn-$(scikit-learn-version).tar.lz
+	$(call import-source, $(scikit-learn-url), $(scikit-learn-checksum))
+	$(call pybuild, tar -xf, scikit-learn-$(scikit-learn-version), , \
+	                Scikit-learn $(scikit-learn-version), GPEP517)
+	echo "scikit-learn $(scikit-learn-version)" > $@
+
 $(ipydir)/six-$(six-version): \
                      $(ipydir)/setuptools-$(setuptools-version)
 	tarball=six-$(six-version).tar.lz
@@ -1026,6 +1295,29 @@ $(ipydir)/sympy-$(sympy-version): $(ipydir)/mpmath-$(mpmath-version)
 	cp $(dtexdir)/sympy.tex $(ictdir)/
 	echo "SymPy $(sympy-version) \citep{sympy}" > $@
 
+$(ipydir)/threadpoolctl-$(threadpoolctl-version): \
+                     $(ipydir)/flit-core-$(flit-core-version)
+	tarball=threadpoolctl-$(threadpoolctl-version).tar.lz
+	$(call import-source, $(threadpoolctl-url), $(threadpoolctl-checksum))
+	$(call pybuild, tar -xf, threadpoolctl-$(threadpoolctl-version), , \
+	                threadpoolctl $(threadpoolctl-version), GPEP517)
+	echo "threadpoolctl $(threadpoolctl-version)" > $@
+
+$(ipydir)/tqdm-$(tqdm-version): \
+                    $(ipydir)/setuptools-scm-$(setuptools-scm-version)
+	tarball=tqdm-$(tqdm-version).tar.lz
+	$(call import-source, $(tqdm-url), $(tqdm-checksum))
+	$(call pybuild, tar -xf, \
+	            tqdm-$(tqdm-version),, \
+	            Tqdm $(tqdm-version), GPEP517)
+
+$(ipydir)/trove-classifiers-$(trove-classifiers-version): \
+                  $(ipydir)/setuptools-$(setuptools-version)
+	tarball=trove-classifiers-$(trove-classifiers-version).tar.lz
+	$(call import-source, $(trove-classifiers-url), $(trove-classifiers-checksum))
+	$(call pybuild, tar -xf, \
+	            trove-classifiers-$(trove-classifiers-version),,, GPEP517)
+
 $(ipydir)/uncertainties-$(uncertainties-version): $(ipydir)/numpy-$(numpy-version)
 	tarball=uncertainties-$(uncertainties-version).tar.lz
 	$(call import-source, $(uncertainties-url), $(uncertainties-checksum))
@@ -1039,6 +1331,13 @@ $(ipydir)/urllib3-$(urllib3-version): \
 	$(call import-source, $(urllib3-url), $(urllib3-checksum))
 	$(call pybuild, tar -xf, urllib3-$(urllib3-version), , \
 	                Urllib3 $(urllib3-version))
+
+$(ipydir)/versioneer-$(versioneer-version): \
+                  $(ipydir)/setuptools-$(setuptools-version)
+	tarball=versioneer-$(versioneer-version).tar.lz
+	$(call import-source, $(versioneer-url), $(versioneer-checksum))
+	$(call pybuild, tar -xf, versioneer-$(versioneer-version), , \
+	                Versioneer $(versioneer-version), GPEP517)
 
 $(ipydir)/webencodings-$(webencodings-version): \
                        $(ipydir)/setuptools-$(setuptools-version) \

@@ -47,17 +47,18 @@ fi
 
 
 
-# Find all the files that contain the '/bin/sh' string and correct them to
-# Maneage's own Bash. We are using 'while read' to read the file names line
-# by line. This is necessary to account file names that include the 'SPACE'
-# character (happens in CMake for example!).
+# Find all the files that contain the '/bin/sh' or '/bin/bash' strings and
+# correct them to Maneage's own shell (Dash or Bash). We are using 'while
+# read' to read the file names line by line. This is necessary to account
+# file names that include the 'SPACE' character (happens in CMake for
+# example!).
 #
 # Note that dates are important in the source directory (files depend on
 # each other), so we should read the original date and after making. We are
 # also not using GNU SED's '-i' ('--in-place') option because the host OS
 # may not have GNU SED.
 #
-# Actual situation which prompted the addition of this step: a Maneage'd
+# The situation which prompted the addition of this step: a Maneage'd
 # project (with GNU Bash 5.1.8 and Readline 8.1.1) was being built on a
 # system where '/bin/sh' was GNU Bash 5.2.26 and had Readline 8.2.010. The
 # newer version of Bash needed the newer Readline library function(s) that
@@ -74,7 +75,8 @@ fi
 # hard-coded in the source code of almost all programs (their build
 # scripts); and in special programs like GNU Make, GNU M4 or CMake it is
 # actually hardcoded in the source code (not just build scripts).
-if [ -f "$bindir/bash" ]; then shpath="$bindir"/bash
+bashpath="$bindir"/bash
+if [ -f "$bindir/bash" ]; then shpath="$bashpath"
 else                           shpath="$bindir"/dash
 fi
 
@@ -91,7 +93,7 @@ fi
 # precision up to the seconds. We then use 'sed' to remove the information
 # regarding the timezone, as the format is not accepted by 'touch'.
 # LCTYPE and LANG are also required on macos systems by sed.
-grep -I -r -e'/bin/sh' $(pwd)/* \
+grep -I -r -e'/bin/sh' -e'/bin/bash' $(pwd)/* \
     | sed -e's|:|\t|' \
     | awk 'BEGIN{FS="\t"}{print $1}' \
     | sort \

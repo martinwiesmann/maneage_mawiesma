@@ -138,11 +138,44 @@ $(mtexdir)/verify.tex: $(foreach s, $(verify-dep), $(mtexdir)/$(s).tex)
 
 #	  Verify TeX macros (the values that go into the PDF text).
 	  for m in $(verify-check); do
-	    file=$(mtexdir)/$$m.tex
-	    if [ $$m == delete-me ]; then s=711e2f7fa1f16ecbeeb3df6bcb4ec705
-	    else echo; echo "'$$m' not recognized."; exit 1
+
+#	    Set the macro file name, make sure it exists (the user may have
+#	    forgot to create it in the respective sub-Makefile).
+	    tfile=$(mtexdir)/$$m.tex
+	    if ! [ -f $$tfile ]; then
+	      printf "$$tfile: ERROR: does not exist! If you do not "
+	      printf "(currently) plan macros to be added to the final "
+	      printf "PDF from that sub-Makefile, do the following to "
+	      printf "avoid this error: put a 'touch \$$@' as the recipe "
+	      printf "of the '\$$(mtexdir)/$$m.tex' target (at the bottom "
+	      printf "of 'reproduce/analysis/make/$$m.mk'). If you later "
+	      printf "decide to define macros there, simply replace the "
+	      printf "temporary 'touch \$$@' command with the command(s) "
+	      printf "to prepare/write the macro (see 'initialize.mk' "
+	      printf "as an example)\n";
+	      exit 1
 	    fi
-	    $(call verify-txt-no-comments-no-space, $$file, $$s, $@.tmp)
+
+#	    Check the hash for this file and verify it.
+	    case $$m in
+	      delete-me) s=711e2f7fa1f16ecbeeb3df6bcb4ec705;;
+	      *) # This file's hash is not in the list above.
+
+#	         If the file is empty, we can skip it (with the 'continue'
+#	         command). Otherwise, the user should be informed with an
+#	         error.
+	         if [ -s $$tfile ]; then
+	            printf "$$tfile: ERROR: please add the hash of this "
+	            printf "macro file to the list of hashes above this "
+	            printf "error message (in "
+	            printf "'reproduce/analysis/make/verify.mk')\n"; exit 1
+	         else
+	            continue
+	         fi
+	         ;;
+	    esac
+	    $(call verify-txt-no-comments-no-space, $$tfile, $$s, $@.tmp)
+
 	  done
 
 #	  Move temporary file to final target.

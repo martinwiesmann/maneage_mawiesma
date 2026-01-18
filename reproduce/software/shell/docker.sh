@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 #
 # Create a Docker container from an existing image of the built software
 # environment, but with the source, data and build (analysis) directories
@@ -409,22 +409,25 @@ else
         # that the user gave there.
         mkdir $tmp_dir/$tsdir
         cp -r "$software_dir"/* $tmp_dir/$tsdir/
-        printf "    --mount=type=bind,source=$tsdir,target=$dts \x5C\n" >> $df
+        printf "    --mount=type=bind,source=$tsdir,target=$dts \x5C\n" \
+               >> $df
     fi
 
     # Construct the rest of the 'RUN' command.
     printf "    cp -r $dsr /home/maneager/source; \x5C\n"          >> $df
     printf "    cd /home/maneager/source; \x5C\n"                  >> $df
-    printf "    ./project configure --jobs=$jobs \x5C\n"           >> $df
+    printf "    ./project configure \x5C\n"                        >> $df
+    printf "              --no-pause \x5C\n"                       >> $df
+    printf "              --jobs=$jobs \x5C\n"                     >> $df
     printf "              --build-dir=$intbuild \x5C\n"            >> $df
     printf "              --input-dir=/home/maneager/input \x5C\n" >> $df
-    printf "              --software-dir=$dts; \x5C\n"             >> $df
+    printf "              --software-dir=$dts; \x5C\n"  >> $df
 
-    # We are deleting the '.build/software/tarballs' directory because this
-    # directory is not relevant for the analysis of the project. But in
-    # case any tarball was downloaded, it will consume space within the
-    # container.
-    printf "    rm -rf .build/software/tarballs; \x5C\n" >> $df
+    # We are deleting the contents of the '.build/software/tarballs'
+    # directory (tarballs of the sources of the software) because they are
+    # not relevant to the execution of the project and will consume space
+    # within the container.
+    printf "    rm -rf .build/software/tarballs/*; \x5C\n" >> $df
 
     # We are deleting the source directory becaues later (at 'docker run'
     # time), the 'source' will be mounted directly from the host operating
@@ -432,12 +435,9 @@ else
     printf "    cd /home/maneager; \x5C\n" >> $df
     printf "    rm -rf source\n" >> $df
 
-    # Build the Maneage container and delete the temporary directory. The
-    # '--progress plain' option is for Docker to print all the outputs
-    # (otherwise, it will only print a very small part!).
+    # Build the Maneage container and delete the temporary directory.
     cd $tmp_dir
     docker build ./ -t $project_name \
-           --progress=plain \
            --shm-size=$shm_size \
            --no-cache \
            2>&1 | tee build.log
@@ -453,14 +453,15 @@ if ! [ x"$image_file" = x ] && ! [ -f "$image_file" ]; then
     # Save the image into a tarball
     tarname=$(echo $image_file | sed -e's|.gz$||')
     if [ $quiet = 0 ]; then
-        printf "$scriptname: info: saving docker image to '$tarname'"
+        printf "$scriptname: info: saving docker image to '$tarname'\n"
     fi
     docker save -o $tarname $project_name
 
     # Compress the saved image
     if [ $quiet = 0 ]; then
         printf "$scriptname: info: compressing to '$image_file' (can "
-        printf "take +10 minutes, but volume decreases by more than half!)"
+        printf "take +10 minutes, but volume decreases by more than "
+        printf "half!)\n"
     fi
     gzip --best $tarname
 fi
@@ -470,7 +471,7 @@ fi
 if ! [ x"$build_only" = x ]; then
     if [ $quiet = 0 ]; then
         printf "$scriptname: info: Maneaged project has been configured "
-        printf "successfully in the '$project_name' image"
+        printf "successfully in the '$project_name' image\n"
     fi
     exit 0
 fi

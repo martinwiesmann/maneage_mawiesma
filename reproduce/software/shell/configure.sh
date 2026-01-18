@@ -228,7 +228,7 @@ empty_build_tmp() {
     # accidentally delete the whole root partition (or a least the '/home'
     # partition of the user).
     if ! [ x"$( ls -A $tmpblddir )" = x ]; then
-        rm -r "$tmpblddir"/*
+        rm -rf "$tmpblddir"/*
     fi
     rm -r "$tmpblddir"
 }
@@ -378,7 +378,11 @@ if [ $built_container = 0 ]; then
         # between Intel or Apple M1 CPUs. Here we disinguish between Apple
         # M1 or others.
         maccputype=$(sysctl -n machdep.cpu.brand_string)
-        if [ x"$maccputype" = x"Apple M1" ]; then
+        if    [ x"$maccputype" = x"Apple M1" ] \
+           || [ x"$maccputype" = x"Apple M2" ] \
+           || [ x"$maccputype" = x"Apple M3" ] \
+           || [ x"$maccputype" = x"Apple M4" ] \
+           || [ x"$maccputype" = x"Apple M5" ] ; then
             address_size_physical=$(sysctl -n machdep.cpu.thread_count)
             address_size_virtual=$(sysctl -n machdep.cpu.logical_per_package)
         else
@@ -781,6 +785,25 @@ fi
 
 
 
+# Older C standard versions
+# -------------------------
+#
+# Some basic packages require an old standard of C compilation; for their
+# list, see the 'Not working with C23' list in '../config/versions.conf'.
+# Here, we first try 'gnu17', but if that fails on the host compiler, we
+# fall back to 'gnu99'.
+if [ $built_container = 0 ]; then
+   printf "int main(void){; return 0;}\n" > $testsource
+   if gcc -std=gnu17 $testsource -o $testprog 2> /dev/null; then
+       std_c_old="gnu17"
+   else std_c_old="gnu99"
+   fi
+   rm $testsource $testprog
+fi
+
+
+
+
 # Fortran compiler
 # ----------------
 #
@@ -856,33 +879,6 @@ fi
 
 
 
-# See if the linker accepts -Wl,-rpath-link
-# -----------------------------------------
-#
-# '-rpath-link' is used to write the information of the linked shared
-# library into the shared object (library or program). But some versions of
-# LLVM's linker don't accept it an can cause problems.
-#
-# IMPORTANT NOTE: This test has to be done **AFTER** the definition of
-# 'instdir', otherwise, it is going to be used as an empty string.
-if [ $built_container = 0 ]; then
-   cat > $testsource <<EOF
-#include <stdio.h>
-#include <stdlib.h>
-int main(void) {return EXIT_SUCCESS;}
-EOF
-   if $CC $testsource -o$testprog -Wl,-rpath-link 2>/dev/null \
-          > /dev/null; then
-       export rpath_command="-Wl,-rpath-link=$instdir/lib"
-   else
-       export rpath_command=""
-   fi
-
-   # Delete the temporary directory for compiler checking.
-   rm -f $testprog $testsource
-   rm -r $compilertestdir
-   elapsed_time_from_prev_step compiler-rpath
-fi
 
 
 
@@ -1426,9 +1422,9 @@ elapsed_time_from_prev_step downloader
 # by the algorithm in 'configure.sh' when evaluating the variable
 # 'sys_library_sh_path'. This leads to a fatal syntax error in (at least)
 # 'ncurses', because the option using 'sys_library_sh_path' contains an
-# unquoted RAM address in parentheses.  Even if the address were quoted, it
-# would still be incorrect. This 'grep command excludes candidate host path
-# strings that look like RAM addresses to address the problem.
+# unquoted RAM address in parentheses. Even if the address were quoted, it
+# would still be incorrect. This 'grep' command excludes candidate host
+# path strings that look like RAM addresses to address the problem.
 #
 # [1] https://savannah.nongnu.org/bugs/index.php?66847
 # [2] https://stackoverflow.com/questions/34428037/how-to-interpret-the-output-of-the-ldd-program
@@ -1544,6 +1540,41 @@ if [ $built_container = 0 ]; then
 
     # Report the execution time of this step.
     elapsed_time_from_prev_step subdirectories-of-build
+fi
+
+
+
+
+
+# See if the linker accepts -Wl,-rpath-link
+# -----------------------------------------
+#
+# '-rpath-link' is used to write the information of the linked shared
+# library into the shared object (library or program). But some versions of
+# LLVM's linker don't accept it an can cause problems.
+#
+# IMPORTANT NOTE: This test has to be done **AFTER** the definition of
+# 'instdir'. Otherwise, the rpath-link value set within rpath_command in
+# the case of a successful test compile (if $CC ...) will be "/lib",
+# i.e. the host system root /lib directory, instead of the maneage library
+# directory.
+if [ $built_container = 0 ]; then
+   cat > $testsource <<EOF
+#include <stdio.h>
+#include <stdlib.h>
+int main(void) {return EXIT_SUCCESS;}
+EOF
+   if $CC $testsource -o$testprog -Wl,-rpath-link 2>/dev/null \
+          > /dev/null; then
+       export rpath_command="-Wl,-rpath-link=$instdir/lib"
+   else
+       export rpath_command=""
+   fi
+
+   # Delete the temporary directory for compiler checking.
+   rm -f $testprog $testsource
+   rm -r $compilertestdir
+   elapsed_time_from_prev_step compiler-rpath
 fi
 
 
@@ -1833,6 +1864,7 @@ if [ $quiet = 0 ]; then echo "Building/validating software: basic"; fi
      numthreads=$numthreads \
      needs_ldl=$needs_ldl \
      on_mac_os=$on_mac_os \
+     std_c_old=$std_c_old \
      host_cc=$host_cc \
      -j$numthreads
 elapsed_time_from_prev_step make-software-basic

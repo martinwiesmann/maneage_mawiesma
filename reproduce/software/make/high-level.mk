@@ -438,6 +438,23 @@ $(ibidir)/cfitsio-$(cfitsio-version):
 	tar cf $$customtar cfitsio-$(cfitsio-version)
 	cd $$topdir
 
+#       Add SSE2 optimization only when we are on a Linux kernel or using
+#       macOS on an Intel CPU.
+	arch=$$(uname -m)
+	unames=$$(uname -s)
+	if [ "$$unames" = "Linux" ]; then
+	  confopts="$$confopts --enable-sse2"
+	elif [ "$$unames" = "Darwin" ] && [ "$$arch" = "x86_64" ]; then
+	  confopts="$$confopts --enable-sse2"
+	fi
+
+#       On macOS, system libraries (e.g., libSystem) are inside the SDK,
+#       not standard paths. 'xcrun' provides the correct SDK path; use $$
+#       so it is evaluated by the shell (not Make).
+	if [ $(on_mac_os) = yes ]; then
+	  export SDKROOT=$$(xcrun --show-sdk-path)
+	fi
+
 #	Continue the standard build on the customized tarball. Note that
 #	with the installation of CFITSIO, 'fpack' and 'funpack' are not
 #	installed by default. Because of that, they are added explicity.
@@ -446,7 +463,10 @@ $(ibidir)/cfitsio-$(cfitsio-version):
 #	specific 'shared' target for the building of the shared libraries.
 	export gbuild_tar=$(ddir)/$$customtar
 	$(call gbuild, cfitsio-$(cfitsio-version), , \
-	               --enable-sse2 --enable-reentrant \
+	               $$confopts \
+	               --disable-curl \
+	               --disable-fortran \
+	               --enable-reentrant \
 	               --with-bzip2=$(idir), , \
 	               make fpack funpack)
 	rm $$customtar
@@ -505,35 +525,61 @@ $(ibidir)/expat-$(expat-version):
 	$(call gbuild, expat-$(expat-version), static)
 	echo "Expat $(expat-version)" > $@
 
+# FFTW manual customizations:
+#
+# - To activate the OpenMPI features of FFTW, add OpenMPI as a dependency
+#   of FFTW: the necessary flags are automatically added if OpenMPI was
+#   installed before FFTW.
+#
+# - There are Intel-specific optimizations that can be enabled by adding
+#   the following two options to 'opts'
+#
+#     --enable-avx --enable-sse2
+#
+#   However, they cause crashes on non-Intel processors (has been confirmed
+#   in ARM's aarch64). So in the generic scenario they are
+#   removed. Checking how these optimizations affect the numerical accuracy
+#   of the result (and thus optionally adding them for Intel-based
+#   processors) should be studied before they are optionally added for
+#   Intel-based CPUs (and ignored for others).
 $(ibidir)/fftw-$(fftw-version):
 
 #	Prepare the source tarball.
 	tarball=fftw-$(fftw-version).tar.lz
 	$(call import-source, $(fftw-url), $(fftw-checksum))
 
-#	FFTW's single and double precision libraries must be built
-#	independently: for the the single-precision library, we need to add
-#	the '--enable-float' option. We will build this first, then the
-#	default double-precision library.
-#
-#	There are Intel-specific optimizations that can be enabled by
-#	adding the following two options to 'confop'
-#
-#           --enable-avx --enable-sse2
-#
-#	However, they cause crashs on non-Intel processors (has been
-#	confirmed in ARM's aarch64). So in the generic scenario they are
-#	removed. Checking how these optimizations affect the numeric
-#	accuracy of the result (and thus optionally adding them for
-#	Intel-based processors) should be studied before they are
-#	optionally added for Intel-based CPUs (and ignored for others).
-	confop="--enable-shared --enable-threads"
-	$(call gbuild, fftw-$(fftw-version), static, \
-	               $$confop --enable-float)
-	$(call gbuild, fftw-$(fftw-version), static, \
-	               $$confop)
-	cp $(dtexdir)/fftw.tex $(ictdir)/
+#	Specific customizations: you can add the options mentioned above
+#	after the 'if' statements, for example: "opts=$$opts EXTRA".
+	opts="--enable-shared --enable-threads"
+	if [ x$(on_mac_os) = xyes ]; then opts="$$opts --disable-fortran"
+	else
+	  if [ -f $(ibidir)/openmpi-$(openmpi-version) ]; then
+	    opts="$$opts --enable-openmp --enable-mpi"
+	  fi
+	fi
+
+#	FFTW's single, double and long-double precision libraries must be
+#	built separately (fully independent builds and installs).
+	$(call gbuild, fftw-$(fftw-version), static, $$opts)
+	$(call gbuild, fftw-$(fftw-version), static, $$opts \
+	                                             --enable-float)
+	$(call gbuild, fftw-$(fftw-version), static, $$opts \
+	                                             --enable-long-double)
+	cp -pv $(dtexdir)/fftw.tex $(ictdir)/
 	echo "FFTW $(fftw-version) \citep{fftw}" > $@
+
+# 2026-02-20 'framel' is needed by the python package lalsuite, which is
+# needed by ligo-skymap; currently the compile of 'framel' 8.49.0 fails with
+#
+#    error: initialization of 'void (*)(void)' from incompatible
+#     pointer type 'void (*)(int,  char *)' [-Wincompatible-pointer-types]
+#
+# Hints: try using gcc -std=gnu99 or -std=gnu11 (default is -std=gnu17).
+$(ibidir)/framel-$(framel-version): $(ibidir)/cmake-$(cmake-version)
+	tarball=framel-$(framel-version).tar.lz
+	$(call import-source, $(framel-url), $(framel-checksum))
+	$(call cbuild, framel-$(framel-version), static)
+	echo "Framel $(framel-version)" > $@
 
 $(ibidir)/freetype-$(freetype-version): $(ibidir)/libpng-$(libpng-version)
 #	As of version 2.13.2, FreeType doesn't account for the 'SHELL'
@@ -571,63 +617,113 @@ $(ibidir)/hdf5-$(hdf5-version): $(ibidir)/openmpi-$(openmpi-version)
 	echo "HDF5 library $(hdf5-version)" > $@
 
 # HEALPix includes the source of its C, C++, Python (and several other
-# languages) libraries within one tarball. We will include the Python
-# installation only when any other Python module is requested (in
-# 'TARGETS.conf').
+# languages) libraries within one tarball. However, we do not build the
+# python version here; instead we provide 'healpy' as a separate package;
+# see 'python.mk' for the build rule.
 #
 # Note that the default './configure' script is an interactive script which
 # is hard to automate. So we need to go into the 'autotools' directory of
 # the 'C' and 'cxx' directories and configure the GNU Build System (with
 # 'autoreconf', which uses 'autoconf' and 'automake') to easily build the
 # HEALPix C/C++ libraries in batch mode.
-ifeq ($(strip $(targets-python)),)
-healpix-python-dep =
-else
-healpix-python-dep = $(ipydir)/matplotlib-$(matplotlib-version) \
-                     $(ipydir)/astropy-$(astropy-version)
-endif
-$(ibidir)/healpix-$(healpix-version): $(healpix-python-dep) \
+$(ibidir)/healpix-$(healpix-version): \
                   $(ibidir)/cfitsio-$(cfitsio-version) \
                   $(ibidir)/autoconf-$(autoconf-version) \
                   $(ibidir)/automake-$(automake-version)
+
+#	Import the tarball.
 	tarball=healpix-$(healpix-version).tar.lz
 	$(call import-source, $(healpix-url), $(healpix-checksum))
-	if [ x"$(healpix-python-dep)" = x ]; then
-	   pycommand1="echo no-healpy-because-no-other-python"
-	   pycommand2="echo no-healpy-because-no-other-python"
-	else
-	   pycommand1="python setup.py build"
-	   pycommand2="python setup.py install"
-	fi
-	rm -rf $(ddir)/Healpix_$(healpix-version)
+
+#	Setup the build directory
+	rm -rf $(ddir)/healpix-$(healpix-version)
 	topdir=$(pwd); cd $(ddir);
 	tar -xf $(tdir)/$$tarball --no-same-owner --no-same-permissions
-	cd Healpix_$(healpix-version)
+	cd healpix-$(healpix-version)
 	$(shsrcdir)/prep-source.sh $(ibdir)
-	cd src/C/autotools
+
+#	Compile and install libsharp:
+	cd src/common_libraries/libsharp
 	autoreconf --install
 	./configure --prefix=$(idir)
 	make V=1 -j$(numthreads) SHELL=$(ibdir)/bash
 	make install
-	cd ../../cxx/autotools/
+
+#	Compile and install the C version:
+	cd ../../C/autotools
+	printf "\n\nDEBUG ONLY\n\n"; /bin/pwd; printf "\nGUBED\n\n\n"
+	autoreconf --install
+	./configure --prefix=$(idir)
+	make V=1 -j$(numthreads) SHELL=$(ibdir)/bash
+	make install
+
+#	Compile and install the C++ version:
+	cd ../../cxx/
+	printf "\n\nDEBUG.BBBB ONLY\n\n"; /bin/pwd; printf "\nBBB.GUBED\n\n\n"
 	autoreconf --install
 	./configure --prefix=$(idir)
 
 #	With CFITSIO 4.0, the 'CFITSIO_VERSION' macro has three
-#	components. But this version of Healpix doesn't yet account for
-#	this.
+#	components. But this (which?) version of Healpix doesn't yet
+#	account for this.
 	sed -i -e's/CFITSIO_VERSION/fitsversion/' cxxsupport/fitshandle.cc
 
 #	Continue with the building.
 	make V=1 -j$(numthreads) SHELL=$(ibdir)/bash
 	make install
-	cd ../../healpy
-	$$pycommand1
-	$$pycommand2
+
+#	Finalize the build
 	cd $$topdir
-	rm -rf $(ddir)/Healpix_$(healpix-version)
+	rm -rf $(ddir)/healpix-$(healpix-version)
 	cp $(dtexdir)/healpix.tex $(ictdir)/
 	echo "HEALPix $(healpix-version) \citep{healpix}" > $@
+
+# 2025-05-24 The build rules here for 'lalsuite' include git initialisation
+# with a dummy commit of all the source files since this is required for an
+# install unless the .git/ directory (currently 650 Mb) is included in the
+# tarball. Our lalsuite tarball also has many big data test files removed,
+# since these are unlikely to be needed in typically astronomy usage; this
+# brings the .tar.lz file down to 25 Mb from the default of about 950 Mb
+# (tar.gz) or 740 Mb (tar.lz).
+#
+# If you need to do full gravitational wave work with 'lalsuite', then you
+# should provide an alternative tarball and edit the three files
+# reproduce/software/config/{versions,checksums,urls}.conf in order to use
+# your preferred tarball.
+$(ipydir)/lalsuite-$(lalsuite-version): \
+                   $(ibidir)/automake-$(automake-version) \
+                   $(ibidir)/swig-$(swig-version) \
+                   $(ibidir)/metaio-$(metaio-version) \
+                   $(ibidir)/framel-$(framel-version) \
+                   $(ipydir)/astropy-$(astropy-version) \
+                   $(ipydir)/igwn-segments-$(igwn-segments-version) \
+                   $(ipydir)/lscsoft-glue-$(lscsoft-glue-version) \
+                   $(ipydir)/python-dateutil-$(python-dateutil-version)
+	tarball=lalsuite-$(lalsuite-version).tar.lz
+	$(call import-source, $(lalsuite-url), \
+	         $(lalsuite-checksum))
+
+#	First: build from source as if it's a C source only.
+	cd $(ddir)
+	unpackdir=lalsuite-$(lalsuite-version)
+	rm -rf $$unpackdir
+	tar -xf $(tdir)/$$tarball --no-same-owner --no-same-permissions
+	cd $$unpackdir
+	$(shsrcdir)/prep-source.sh $(ibdir)
+
+#	A git commit is needed to generate version-control files; the
+#	strings in these will be rather arbitrary and should be ignored.
+	git init && git add .
+	git commit -a --no-edit -m "Dummy commit" \
+	           --author "Tarball <tar@ball.only>"
+	autoreconf
+	./configure --prefix="$(idir)" --enable-swig-python
+	make
+	make install
+
+#	Clean up and build final tarball
+	cd $(ddir); rm -fr $$unpackdir
+	echo "LALSuite $(lalsuite-version)" > $@
 
 $(ibidir)/libbsd-$(libbsd-version): $(ibidir)/libmd-$(libmd-version)
 	tarball=libbsd-$(libbsd-version).tar.lz
@@ -840,9 +936,52 @@ $(ibidir)/ninjabuild-$(ninjabuild-version): $(ibidir)/cmake-$(cmake-version)
 	echo "Ninja build system $(ninjabuild-version)" > $@
 
 $(ibidir)/openblas-$(openblas-version):
+
+#	Import the tarball.
 	tarball=openblas-$(openblas-version).tar.lz
 	$(call import-source, $(openblas-url), $(openblas-checksum))
-	if [ x$(on_mac_os) = xyes ]; then export CC=clang; fi
+
+#	If 'gcc' is actually a symbolic link to 'clang', then print the
+#	following message to guide the user on how to prepare their
+#	environment.
+	if $$CC --version | grep clang &> /dev/null; then
+
+#	  Print message.
+	  echo; echo
+	  printf "*********************************************\n"
+	  printf "OpenBlas could not be installed with Clang!\n\n"
+	  printf "In order to install OpenBLAS, GCC and Gfortran are "
+	  printf "needed. You can take the following steps to fix "
+	  printf "this:\n\n"
+	  printf "1. Install GCC with Homebrew.\n"
+	  printf "2. Get the full path of 'gcc', 'g++', and 'gfortran' "
+	  printf "(for example with 'which gcc').\n"
+	  printf "3. Comment the 'exit 1' and un-comment (and edit) the "
+	  printf "'export's that are below this message (in the "
+	  printf "'openblas' rule of "
+	  printf "'reproduce/software/make/high-level.mk', within the "
+	  printf "'openblas' rule):\n\n"
+	  printf "   exit 1\n"
+	  printf "   #export CC=/opt/homebrew/bin/gcc-XX\n"
+	  printf "   #export CXX=/opt/homebrew/bin/g++-XX\n"
+	  printf "   #export FC=/opt/homebrew/bin/gfortran-XX\n\n"
+	  printf "   with the lines:\n\n"
+	  printf "   #exit 1\n"
+	  printf "   export CC=/opt/homebrew/bin/gcc-15\n"
+	  printf "   export CXX=/opt/homebrew/bin/g++-15\n"
+	  printf "   export FC=/opt/homebrew/bin/gfortran-15\n\n"
+	  printf "5. Re-configure Maneage.\n"
+	  printf "*********************************************\n"
+	  echo; echo
+
+#	  Parts to modify when the message above is printed.
+	  exit 1
+	  #export CC=/opt/homebrew/bin/gcc-XX
+	  #export CXX=/opt/homebrew/bin/g++-XX
+	  #export FC=/opt/homebrew/bin/gfortran-XX
+	fi
+
+#	Do the build.
 	cd $(ddir)
 	tar -xf $(tdir)/$$tarball --no-same-owner --no-same-permissions
 	cd openblas-$(openblas-version)
@@ -909,6 +1048,209 @@ $(ibidir)/tides-$(tides-version):
 	cp $(dtexdir)/tides.tex $(ictdir)/
 	echo "TIDES $(tides-version) \citep{tides}" > $@
 
+$(ibidir)/sqlite-$(sqlite-version): $(ibidir)/tcl-$(tcl-version)
+	tarball=sqlite-$(sqlite-version).tar.lz
+	$(call import-source, $(sqlite-url), $(sqlite-checksum))
+	$(call gbuild, sqlite-$(sqlite-version),, \
+	      --enable-all --enable-static --enable-shared)
+	echo "Sqlite $(sqlite-version)" > $@
+
+$(ibidir)/tcl-$(tcl-version): $(ibidir)/zlib-$(zlib-version) \
+                              $(ibidir)/tzdb-$(tzdb-version)
+
+#	If both the tcl and tk packages are needed, then they must be built
+#	together, with identical version numbers. Thus, for simplicity in
+#	the build system, whether or not we build only tcl, or both tcl and
+#	tk, we must check that the versions are identical.
+	if [ "x$(tcl-version)" != "x$(tk-version)" ]; then
+	    printf "Error: This build system requires identical tcl and "
+	    printf "tk versions to be selected **even if** tk is not "
+	    printf "going to be built. However, tcl-version=$(tcl-version) "
+	    printf "while tk-version=$(tk-version)\n"
+	    exit 1
+	fi
+
+#	Prepare the input tarball.
+	tarball=tcl-$(tcl-version).tar.lz
+	$(call import-source, $(tcl-url), $(tcl-checksum))
+
+#	Setup the build directory
+	cd $(ddir)
+	unpackdir_tcl=tcl-$(tcl-version)
+	rm -rf $${unpackdir_tcl}
+
+#	Install TCL
+	tar -xf $(tdir)/$$tarball --no-same-owner --no-same-permissions
+	cd - # return to the top maneage directory
+	cd $(ddir)/$${unpackdir_tcl}/unix
+	$(shsrcdir)/prep-source.sh $(ibdir)
+	./configure --prefix="$(idir)"
+	make -j$(numthreads)
+	make install
+	cd - # return to the top maneage directory
+
+#	Setup the 'tclsh' symbolic link.
+	maj_min_version=$$(printf $(tcl-version)| \
+	      sed -e "s;^\([0-9]*\.[0-9]*\).*\';\1;")
+	printf "Will symlink tclsh$${maj_min_version} as tclsh ...\n"
+	cd $(ibdir)
+	rm -fv tclsh && ln -sv tclsh$${maj_min_version} tclsh
+	cd -
+	cd $(ddir)
+
+#	Finalize.
+	if (printf "$$unpackdir_tcl" | grep "[a-z][a-z]"); then \
+	     rm -fr $$unpackdir_tcl
+	fi
+	echo "Tcl $(tcl-version)" > $(ibidir)/tcl-$(tcl-version)
+
+
+# The tk library needs the X11 library for building GUIs, and should not
+# normally be needed for a non-interactive project. However, GUIs built
+# with tk might be convenient during development of a project, since visual
+# checks within the maneage shell may be useful.
+#
+# We need to rebuild tcl temporarily in the temporary build area in order
+# to build tk. However, we want the tk target to be dependent on tcl as a
+# prerequisite to avoid the possibility of parallel builds that risk
+# conflicting within the build area because of duplicate use of the same
+# tcl package directory after untarring the archive.
+$(ibidir)/tk-$(tk-version): $(ibidir)/zip-$(zip-version) \
+                            $(ibidir)/tcl-$(tcl-version) \
+                            $(ibidir)/libx11-$(libx11-version) \
+
+#	Prepare the tarball.
+	tarball=tk-$(tk-version).tar.lz
+	$(call import-source, $(tk-url), $(tk-checksum))
+
+#	If both the tcl and tk packages are needed, then they must be built
+#	together, with identical version numbers. Thus, for simplicity in
+#	the build system, whether or not we build only tcl, or both tcl and
+#	tk, we must check that the versions are identical.
+	if [ "x$(tcl-version)" != "x$(tk-version)" ]; then
+	    printf "Error: This build system requires identical tcl and "
+	    printf "tk versions to be selected **even if** tk is not "
+	    printf "going to be built. However, tcl-version=$(tcl-version) "
+	    printf "while tk-version=$(tk-version)\n"
+	    exit 1
+	fi
+
+#	Make sure no temporary directory exists.
+	cd $(ddir)
+	unpackdir=tk-$(tk-version)
+	if (printf "$$unpackdir" | grep "[a-z][a-z]"); then
+	  rm -rf $$unpackdir
+	fi
+
+#	Install TK: zipfs is being disabled because of the problem with
+#	installing zip (see the comments above zip).
+	cd $(ddir)
+	tar -xf $(tdir)/$$tarball --no-same-owner --no-same-permissions
+	cd $$unpackdir/unix
+	$(shsrcdir)/prep-source.sh $(ibdir)
+	./configure  --prefix="$(idir)" --with-tcl=$(ildir)
+	make -j$(numthreads)
+	make install
+
+#	Finalize.
+	cd $(ddir)
+	if (printf "$$unpackdir" | grep "[a-z][a-z]"); then \
+	     rm -fr $$unpackdir; fi
+	echo "Tk $(tk-version)" > $(ibidir)/tk-$(tk-version)
+
+
+
+# WARNING: Dependence on glibc: tzdb (time zone data base) uses the 'zic'
+# program from the GNU C library. Until Maneage builds its own glibc, it is
+# imported from the host operating system in the 'low-level-links' step of
+# 'basic.mk'.
+$(ibidir)/tzdb-$(tzdb-version):
+
+#	Import the tarball
+	tarball=tzdb-$(tzdb-version).tar.lz
+	$(call import-source, $(tzdb-url), $(tzdb-checksum))
+
+#	Unpack the tarball.
+	cd $(ddir)
+	unpackdir=tzdb-$(tzdb-version)
+	rm -rf $$unpackdir
+	tar -xf $(tdir)/$$tarball --no-same-owner --no-same-permissions
+	cd $$unpackdir
+
+#	Make necessary corrections.
+	TZGEN=$(strip $(ddir))/$$unpackdir/tzgen
+	printf "\n\n\n_____TZGEN=$${TZGEN}_____\n\n\n"
+	make AWK=gawk BACKWARD="backward" PACKRATDATA=backzone \
+	      PACKRATLIST=zone.tab VERSION_DEPS= tzdata.zi leapseconds
+
+#	Build the timezone data
+#
+#	The '-b fat' option was created in glibc by around 2020, when
+#	'-b slim' became the default. Allowing the default of '-b slim'
+#	could potentially lead to a #Y2038 bug [3].
+#
+#	Some other hacks are also needed for older glibc.
+#
+#	[1] https://mm.icann.org/pipermail/tz-announce/2020-October/000059.html
+#	[2] https://github.com/stub42/pytz/issues/48
+#	[3] https://en.wikipedia.org/wiki/Year_2038_problem
+	BFAT_OPTION=$$(if (zic -b fat 2>/dev/null); then \
+	                 printf "%sb fat" "-"; else printf ""; fi)
+	if [ "x$${BFAT_OPTION}" = "x" ]; then \
+	   sed -e 's/Sa\([^a-zA-Z]\)/Sat\1/g' \
+	       -e 's/Su\([^a-zA-Z]\)/Sun\1/g' \
+	       -e 's/^\(.\|..\) Sat/\1 Sa/' \
+	       -e "s/lastSu\'/lastSun/" tzdata.zi \
+	       | grep -v "^L" \
+	       > tzdata.zi.3letter.days
+	   zic $${BFAT_OPTION} -d $${TZGEN} -L /dev/null \
+	       tzdata.zi.3letter.days
+	   zic $${BFAT_OPTION} -d $${TZGEN}/right -L leapseconds \
+	       tzdata.zi.3letter.days
+	else
+	   zic $${BFAT_OPTION} -d $${TZGEN} -L /dev/null tzdata.zi
+	   zic $${BFAT_OPTION} -d $${TZGEN}/right -L leapseconds \
+	       tzdata.zi
+	fi
+
+#	Replace hardlinks by symlinks
+	if [ "x$${BFAT_OPTION}" = "x" ]; then
+
+#	    Older method of creating symbolic links:
+	    grep '^L ' $(ddir)/$$unpackdir/tzdata.zi \
+	      | while read L target name ; do
+	          absolute_name="$${TZGEN}/$$name"
+	          relative_target=$$(realpath -m -s \
+	                             --relative-to="$${absolute_name%/*}" \
+	                             "$${TZGEN}/$$target")
+	          maybe_newdir=$$(printf $$name | sed -e "s;/[^/]*\';;")
+	          mkdir -p $${TZGEN}/$${maybe_newdir}
+	          mkdir -p $${TZGEN}/right/$${maybe_newdir}
+	          ln -sf "$$relative_target" "$${TZGEN}/$$name"
+	          ln -sf "$$relative_target" "$${TZGEN}/right/$$name"
+	        done
+
+	else
+
+#	    More recent (2025-05-25) method of creating symbolic links:
+	    grep '^L ' $(ddir)/$$unpackdir/tzdata.zi \
+	      | while read L target name ; do
+	          absolute_name="$${TZGEN}/$$name"
+	          relative_target=$$(realpath -m -s \
+	                              --relative-to="$${absolute_name%/*}" \
+	                              "$${TZGEN}/$$target")
+	          ln -sf "$$relative_target" "$${TZGEN}/$$name"
+	          ln -sf "$$relative_target" "$${TZGEN}/right/$$name"
+	        done
+	fi
+
+#	Generate a posixrules file (with a UTC timezone) and install.
+	ln -s Etc/UTC $${TZGEN}/posixrules
+	mkdir -p $(idir)/share/zoneinfo
+	cp -rv $${TZGEN}/* $(idir)/share/zoneinfo/
+	cd $(ddir); rm -rf $$unpackdir
+	echo "IANA Time Zone Database (tzdb) $(tzdb-version)" > $@
+
 $(ibidir)/valgrind-$(valgrind-version):
 	tarball=valgrind-$(valgrind-version).tar.lz
 	$(call import-source, $(valgrind-url), $(valgrind-checksum))
@@ -964,7 +1306,19 @@ $(ibidir)/wcslib-$(wcslib-version): $(ibidir)/cfitsio-$(cfitsio-version)
 	tarball=wcslib-$(wcslib-version).tar.lz
 	$(call import-source, $(wcslib-url), $(wcslib-checksum))
 
+#	macOS arm64 fix: reserve extra space in binary headers so
+# 	install_name_tool (called bellow, after installation) can safely
+# 	update library paths. Without this, we get the following error:
+# 	"larger updated load commands do not fit". SDKROOT is also
+# 	necessary for system libraries.
+	if [ x$(on_mac_os) = xyes ]; then
+	  sdk=$$(xcrun --show-sdk-path)
+	  LDFLAGS="$$LDFLAGS -isysroot $$sdk"
+	  export LDFLAGS="$$LDFLAGS -Wl,-headerpad_max_install_names"
+	fi
+
 #	Build WCSLIB while disabling some features:
+#
 #	- Fortran is disabled because as of May 2023, on macOS systems
 #	  where we do not install GCC (and thus a standard 'gfortran'), the
 #	  LLVM Fortran compiler is not complete and will cause a crash. If
@@ -973,11 +1327,18 @@ $(ibidir)/wcslib-$(wcslib-version): $(ibidir)/cfitsio-$(cfitsio-version)
 #	  systems. Hopefully some time in the future, GCC will also be
 #	  install-able on macOS within Maneage or LLVM's 'gfortran' will
 #	  also be complete and will not cause a crash.
+#
 #	- PGPLOT is disabled because it has many manual steps in its
 #	  installation. Therefore, we currently do not build PGPlots in
 #	  Maneage. Once (if) it is added, we can remove '--without-pgplot'.
+#
+#	- Flex is disabled because we have not made it a prerequisite for
+#	  the 'wcslib' target, and we don't want the behaviour to differ
+#	  between host OSes that may or may not have 'flex', or may have
+#	  different versions of 'flex'.
 	$(call gbuild, wcslib-$(wcslib-version), , \
 	               LIBS="-pthread -lcurl -lm" \
+	               --disable-flex \
 	               --without-pgplot \
 	               --disable-fortran \
                        --with-cfitsiolib=$(ildir) \
@@ -1190,9 +1551,8 @@ $(ibidir)/ghostscript-$(ghostscript-version): \
 #	On macOS we use the system compiler and linker. The system linker
 #	there doesn't support '--copy-dt-needed-entries', while the one on
 #	Linux crashes if we remove it. So we only activate it on macOS.
-	ldflags=""
 	if [ x$(on_mac_os) = xno ]; then
-	     ldflags="LDFLAGS=-Wl,--copy-dt-needed-entries"
+	  export LDFLAGS="$$LDFLAGS -Wl,--copy-dt-needed-entries"
 	fi
 
 #	Unpack it and configure Ghostscript. The option
@@ -1202,8 +1562,7 @@ $(ibidir)/ghostscript-$(ghostscript-version): \
 	tar -xf $(tdir)/$$tarball --no-same-owner --no-same-permissions
 	cd ghostscript-$(ghostscript-version)
 	$(shsrcdir)/prep-source.sh $(ibdir)
-	./configure $$ldflags \
-	            --disable-cups \
+	./configure --disable-cups \
 	            --prefix=$(idir) \
 	            --enable-dynamic \
 	            --disable-compile-inits \
@@ -1405,6 +1764,16 @@ $(ibidir)/imfit-$(imfit-version): \
 	rm -rf $$unpackdir
 	echo "Imfit $(imfit-version) \citep{imfit2015}" > $@
 
+# This is the LIGO lscsoft package 'metaio' [1] (to be distinguished from
+# some other packages with the same name).
+#
+# [1] https://git.ligo.org/lscsoft/metaio
+$(ibidir)/metaio-$(metaio-version):
+	tarball=metaio-$(metaio-version).tar.lz
+	$(call import-source, $(metaio-url), $(metaio-checksum))
+	$(call gbuild, metaio-$(metaio-version), static)
+	echo "Lscsoft Metaio $(metaio-version)" > $@
+
 # Minizip 1.x is actually distributed within zlib. It doesn't have its own
 # independent tarball. So we need a custom build, which include the GNU
 # Autotools (Autoconf and Automake). Note that Minizip 2.x isn't like this
@@ -1511,6 +1880,25 @@ $(ibidir)/netpbm-$(netpbm-version): \
 	rm -rf $$unpackdir
 	echo "Netpbm $(netpbm-version)" > $@
 
+$(ibidir)/parallel-$(parallel-version):
+
+#	Prepare the tarball and build it.
+	tarball=parallel-$(parallel-version).tar.lz
+	$(call import-source, $(parallel-url), $(parallel-checksum))
+	$(call gbuild, parallel-$(parallel-version), static)
+
+#	GNU Parallel requires the users to acknowledge that they will cite
+#	it. Otherwise, it prints a warning on every run: reminding the user
+#	to cite it. In Maneage, we make sure that all software that request
+#	citation are cited automatically, so there is no need for a
+#	Maneager to get this warning and we can automatically ensure the
+#	developer that it will be cited.
+	echo "will cite" | $(ibdir)/parallel --citation
+
+#	Copy the BibTeX source of the citation and finish.
+	cp -pv $(dtexdir)/parallel.tex $(ictdir)/
+	echo "GNU Parallel $(parallel-version) \citep{parallel}" > $@
+
 $(ibidir)/patch-$(patch-version):
 	tarball=patch-$(patch-version).tar.gz
 	$(call import-source, $(patch-url), $(patch-checksum))
@@ -1528,6 +1916,13 @@ $(ibidir)/pcre-$(pcre-version):
 	               --enable-pcregrep-libz \
 	               , V=1 -j$(numthreads))
 	echo "Perl Compatible Regular Expressions $(pcre-version)" > $@
+
+$(ibidir)/pcre2-$(pcre2-version):
+	tarball=pcre2-$(pcre2-version).tar.lz
+	$(call import-source, $(pcre2-url), $(pcre2-checksum))
+	$(call gbuild, pcre2-$(pcre2-version), static)
+	echo "Perl Compatible Regular Expressions 2 $(pcre2-version)" > $@
+
 
 # On macOS 12.3 Monterey with AppleClang 13.1.6.13160021, Plplot 5.15.0
 # needs the 'finite' function of 'math.h' which has been deprecated in
@@ -1695,15 +2090,13 @@ $(ibidir)/swarp-$(swarp-version): $(ibidir)/fftw-$(fftw-version)
 	cp $(dtexdir)/swarp.tex $(ictdir)/
 	echo "SWarp $(swarp-version) \citep{swarp}" > $@
 
-$(ibidir)/swig-$(swig-version):
-
-#	Option --without-pcre was a suggestion once the configure step was
-#	tried and it failed. It was not recommended but it works!  pcr is a
-#	dependency of swig
+$(ibidir)/swig-$(swig-version): \
+                          $(ibidir)/pcre2-$(pcre2-version)
+#	Not disabling pcre, since PCRE is needed for lalsuite (python).
 	tarball=swig-$(swig-version).tar.lz
 	$(call import-source, $(swig-url), $(swig-checksum))
 	$(call gbuild, swig-$(swig-version), static, \
-	               --without-pcre --without-tcl)
+	               --without-tcl)
 	echo "Swig $(swig-version)" > $@
 
 # The disables:
@@ -1778,6 +2171,10 @@ $(ibidir)/util-linux-$(util-linux-version): \
 #	https://github.com/util-linux/util-linux/pull/2531#issuecomment-1798020594)
 	sed -i '/flex/d' autogen.sh
 	./autogen.sh
+
+#	The 'autogen.sh' call resets the 'SHELL' (that was corrected in
+#	'prep-source.sh') to '/bin/sh'. Therefore, we need to correct it.
+	sed -i -e's|SHELL = /bin/sh|SHELL = $(SHELL)|' po/Makefile.in.in
 
 #	Having updated 'configure.ac', we need to re-generate the
 #	'./configure' script with 'autoreconf' (which is part of Autoconf
@@ -1892,16 +2289,28 @@ $(ibidir)/unzip-$(unzip-version): $(ibidir)/gzip-$(gzip-version)
 	               BINDIR=$(ibdir) MANDIR=$(idir)/man/man1 )
 	echo "Unzip $(unzip-version)" > $@
 
-$(ibidir)/zip-$(zip-version): $(ibidir)/gzip-$(gzip-version)
+$(ibidir)/zip-$(zip-version):
+
+#	Prepare the tarball and build directory.
 	tarball=zip-$(zip-version).tar.lz
 	$(call import-source, $(zip-url), $(zip-checksum))
-	$(call gbuild, zip-$(zip-version), static,, \
-	               -f unix/Makefile generic \
-	               CFLAGS="-DBIG_MEM -DMMAP",,pwd, \
-	               -f unix/Makefile generic \
-	               BINDIR=$(ibdir) MANDIR=$(idir)/man/man1 )
-	echo "Zip $(zip-version)" > $@
 
+#	Unpack and go into the directory.
+	export LDFLAGS="$$LDFLAGS -static"
+	cd $(ddir)
+	rm -fr zip-$(zip-version)/
+	tar -xf $(tdir)/$$tarball --no-same-owner --no-same-permissions
+	cd zip-$(zip-version)/
+
+#	Build and install
+	make SHELL=$(ibdir)/bash -f unix/Makefile generic
+	make SHELL=$(ibdir)/bash install -f unix/Makefile \
+	     generic BINDIR=$(ibdir) MANDIR=$(idir)/man/man1
+
+#	Go back to the top build directory, clean up and finalize.
+	cd $(ddir)
+	rm -rf zip-$(zip-version)/
+	echo "Zip $(zip-version)" > $@
 
 
 

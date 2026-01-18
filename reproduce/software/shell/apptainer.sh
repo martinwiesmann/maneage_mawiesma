@@ -195,13 +195,14 @@ done
 #
 # Make sure that the build directory is given and that it exists.
 if [ x$build_dir = x ]; then
-    printf "$scriptname: '--build-dir' not provided, this is the location "
-    printf "that all built analysis files will be kept on the host OS\n"
+    printf "$scriptname: '--build-dir' not provided, this is the "
+    printf "location that all built analysis files will be kept on "
+    printf "the host OS\n"
     exit 1;
 else
     if ! [ -d $build_dir ]; then
-        printf "$scriptname: '$build_dir' (value to '--build-dir') doesn't "
-        printf "exist\n"
+        printf "$scriptname: '$build_dir' (value to '--build-dir') "
+        printf "doesn't exist\n"
         exit 1;
     fi
 fi
@@ -364,7 +365,7 @@ From: $base_sif
      else \\
         printf "$scriptname: '\$maneage_apptainer_stat' (value "; \\
         printf "to 'maneage_apptainer_stat' environment variable) "; \\
-        printf "is not recognized: should be either 'shell' or 'run'"; \\
+        printf "is not recognized: should be either 'shell' or 'run'\n"; \\
         exit 1; \\
      fi; \\
   else \\
@@ -399,7 +400,7 @@ fi
 if ! [ x"$build_only" = x ]; then
     if [ $quiet = 0 ]; then
         printf "$scriptname: info: Maneaged project has been configured "
-        printf "successfully in the '$sif' image"
+        printf "successfully in the '$sif' image\n"
     fi
     exit 0
 fi
