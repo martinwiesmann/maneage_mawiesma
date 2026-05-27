@@ -375,20 +375,22 @@ if [ $built_container = 0 ]; then
         fi
 
         # On macOS, the way of obtaining the number of cores is different
-        # between Intel or Apple M1 CPUs. Here we disinguish between Apple
-        # M1 or others.
-        maccputype=$(sysctl -n machdep.cpu.brand_string)
-        if    [ x"$maccputype" = x"Apple M1" ] \
-           || [ x"$maccputype" = x"Apple M2" ] \
-           || [ x"$maccputype" = x"Apple M3" ] \
-           || [ x"$maccputype" = x"Apple M4" ] \
-           || [ x"$maccputype" = x"Apple M5" ] ; then
-            address_size_physical=$(sysctl -n machdep.cpu.thread_count)
-            address_size_virtual=$(sysctl -n machdep.cpu.logical_per_package)
-        else
-            address_size_physical=$(sysctl -n machdep.cpu.address_bits.physical)
-            address_size_virtual=$(sysctl -n machdep.cpu.address_bits.virtual)
-        fi
+        # between Intel or Apple Silicon CPUs. Here we distinguish between
+        # Apple Silicon (any "Apple M*" brand string, e.g. M1, M1 Pro,
+        # M1 Max, M2, M2 Pro, ...) and Intel-based Macs. The exact-string
+        # comparisons used previously missed variants like "Apple M1 Pro",
+        # so we use a prefix match via a 'case' pattern instead.
+        maccputype=$(sysctl -n machdep.cpu.brand_string 2>/dev/null)
+        case "$maccputype" in
+            "Apple M"*)
+                address_size_physical=$(sysctl -n machdep.cpu.thread_count)
+                address_size_virtual=$(sysctl -n machdep.cpu.logical_per_package)
+                ;;
+            *)
+                address_size_physical=$(sysctl -n machdep.cpu.address_bits.physical)
+                address_size_virtual=$(sysctl -n machdep.cpu.address_bits.virtual)
+                ;;
+        esac
         address_sizes="$address_size_physical bits physical, "
         address_sizes+="$address_size_virtual bits virtual"
     else
