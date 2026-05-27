@@ -420,28 +420,15 @@ $(ibidir)/pkg-config-$(pkgconfig-version): $(ibidir)/tar-$(tar-version)
 #	'libiconv'.
 	rm -f $(ildir)/libiconv* $(idir)/include/iconv.h
 
-#	Some Mac OS systems may have a version of the GNU C Compiler (GCC)
-#	installed that doesn't support some necessary features of building
-#	Glib (as part of pkg-config), so we will disable pkg-config's
-#	internal Glib for Mac systems, and to be further safe, we'll make
-#	sure it will use LLVM's Clang.
-#
-#	On macOS systems, to ensure that Clang can build pkg-config, take
-#	the following steps:
-#	1. Install the latest Glib via Homebrew:
-#	    brew install glib
-#	2. Set these environment variables before configuring Maneage:
-#	    export GLIB_CFLAGS=$(pkg-config --cflags glib-2.0)
-#	    export GLIB_LIBS=$(pkg-config --libs glib-2.0)
-#   	3. Ensure PKG_CONFIG_PATH includes Homebrew's pkgconfig:
-#	    export PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH
+#	Always use pkg-config's bundled internal Glib so no system glib is
+#	required. On macOS we additionally force Clang, because some GCC
+#	versions shipped with Xcode lack features needed to build Glib.
 	if [ x$(on_mac_os) = xyes ]; then
-	  extra_pkgconf=""
 	  export compiler="CC=clang"
 	else
 	  export compiler=""
-	  extra_pkgconf="--with-internal-glib"
 	fi
+	extra_pkgconf="--with-internal-glib"
 	export CFLAGS="-std=$(std_c_old) $$CFLAGS"
 	$(call gbuild, pkg-config-$(pkgconfig-version), static, \
 		$$compiler $$extra_pkgconf \
