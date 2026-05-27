@@ -465,7 +465,7 @@ $(ibidir)/cfitsio-$(cfitsio-version):
 	$(call gbuild, cfitsio-$(cfitsio-version), , \
 	               $$confopts \
 	               --disable-curl \
-	               --disable-fortran \
+	               --without-fortran \
 	               --enable-reentrant \
 	               --with-bzip2=$(idir), , \
 	               make fpack funpack)
