@@ -130,6 +130,14 @@ while [ ! -f "$outname" ]; do
         flock "$lockfile" sh -c \
               "if ! $downloader $outname \"$inurl\"; then rm -f $outname; fi"
     fi
+    # Some servers return HTTP 4xx/5xx errors as an HTML page with a 200
+    # status, so the downloader exits 0 and saves the HTML body to disk.
+    # Detect this by checking whether the response starts with an HTML tag
+    # and treat it as a failed download so backup servers will be tried.
+    if [ -f "$outname" ] && head -c 500 "$outname" 2>/dev/null \
+                              | grep -qi '<html'; then
+        rm -f "$outname"
+    fi
 
     # If the download failed, try the backup server(s).
     if [ ! -f "$outname" ]; then
@@ -137,11 +145,22 @@ while [ ! -f "$outname" ]; do
             for bs in $backupservers; do
 
                 # Use this backup server.
+                # For Zenodo backup servers, append ?download=1 as well.
+                bsurl="$bs/$urlfile"
+                echo "Trying backup server: $bsurl"
+                case "$bsurl" in
+                    *zenodo.org*) bsurl="${bsurl}?download=1" ;;
+                esac
                 if [ x"$lockfile" = xnolock ]; then
-                    if ! $downloader $outname $bs/$urlfile; then rm -f $outname; fi
+                    if ! $downloader $outname "$bsurl"; then rm -f $outname; fi
                 else
                     flock "$lockfile" sh -c \
-                          "if ! $downloader $outname $bs/$urlfile; then rm -f $outname; fi"
+                          "if ! $downloader $outname \"$bsurl\"; then rm -f $outname; fi"
+                fi
+                # Same HTML-response check for backup servers.
+                if [ -f "$outname" ] && head -c 500 "$outname" 2>/dev/null \
+                                          | grep -qi '<html'; then
+                    rm -f "$outname"
                 fi
 
                 # If the file was downloaded, break out of the loop that

@@ -134,6 +134,12 @@ download_tarball() {
         echo "ERROR: Non-matching checksum: $tarball"
         echo "Checksum should be: $expectedchecksum"
         echo "Checksum is:        $checksum"
+        echo "The tarball is either corrupted or not the correct one. Please check:"
+        echo "  - The URL: $tarballurl"
+        echo "  - The backup servers: $bservers"
+        echo " Removing the tarball and exiting."
+        rm -f "$ucname"
+
         exit 1
       fi;
     else mv "$ucname" "$maneagetar"
