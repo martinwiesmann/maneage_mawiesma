@@ -423,23 +423,36 @@ $(ibidir)/pkg-config-$(pkgconfig-version): $(ibidir)/tar-$(tar-version)
 #	Always use pkg-config's bundled internal Glib so no system glib is
 #	required. On macOS we additionally force Clang, because some GCC
 #	versions shipped with Xcode lack features needed to build Glib.
-#	We also pre-set 'lt_cv_deplibs_check_method=pass_all' on macOS:
-#	pkg-config-0.29.2 ships a vintage libtool that cannot verify
-#	'.la' files from subdirectories on Apple Silicon's linker, causing
-#	"cannot find library ./glib/glib/libglib-2.0.la". Setting
-#	pass_all tells libtool to skip the check and hand the file
-#	directly to the linker, which handles it fine.
+#	On macOS ARM64 an additional problem arises: the bundled glib
+#	sub-configure checks for Carbon support with the C preprocessor
+#	only. <Carbon/Carbon.h> exists in the Xcode SDK on Apple Silicon,
+#	so the check passes and '-framework Carbon' is appended to LDFLAGS.
+#	But Carbon cannot actually be linked on ARM64, so every subsequent
+#	linker test in glib's configure fails silently and libglib-2.0.la
+#	is never created. We work around this by passing gbuild a tiny
+#	wrapper script (instead of ./configure) that patches glib/configure
+#	to force glib_have_carbon=no before the real configure runs.
 	if [ x$(on_mac_os) = xyes ]; then
 	  export compiler="CC=clang"
-	  extra_pkgconf="--with-internal-glib lt_cv_deplibs_check_method=pass_all"
+	  case "$$(uname -m)" in
+	    arm64 | aarch64)
+	      CFLAGS="-Wno-int-conversion $$CFLAGS"
+	      pc_wrap=$$(mktemp /tmp/pkg-config-configure.XXXXXX)
+	      printf '#!/bin/sh\n' > $$pc_wrap
+	      printf 'sed -i.bak "s/^  glib_have_carbon=yes$$/  glib_have_carbon=no/" glib/configure\n' >> $$pc_wrap
+	      printf 'exec ./configure "$$@"\n' >> $$pc_wrap
+	      chmod +x $$pc_wrap ;;
+	    *) pc_wrap=./configure ;;
+	  esac
 	else
 	  export compiler=""
-	  extra_pkgconf="--with-internal-glib"
+	  pc_wrap=./configure
 	fi
+	extra_pkgconf="--with-internal-glib"
 	export CFLAGS="-std=$(std_c_old) $$CFLAGS"
 	$(call gbuild, pkg-config-$(pkgconfig-version), static, \
 		$$compiler $$extra_pkgconf \
-		--with-pc-path=$(ildir)/pkgconfig, V=1)
+		--with-pc-path=$(ildir)/pkgconfig, V=1, , $$pc_wrap)
 	echo "pkg-config $(pkgconfig-version)" > $@
 
 
