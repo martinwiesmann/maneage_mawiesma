@@ -423,12 +423,19 @@ $(ibidir)/pkg-config-$(pkgconfig-version): $(ibidir)/tar-$(tar-version)
 #	Always use pkg-config's bundled internal Glib so no system glib is
 #	required. On macOS we additionally force Clang, because some GCC
 #	versions shipped with Xcode lack features needed to build Glib.
+#	We also pre-set 'lt_cv_deplibs_check_method=pass_all' on macOS:
+#	pkg-config-0.29.2 ships a vintage libtool that cannot verify
+#	'.la' files from subdirectories on Apple Silicon's linker, causing
+#	"cannot find library ./glib/glib/libglib-2.0.la". Setting
+#	pass_all tells libtool to skip the check and hand the file
+#	directly to the linker, which handles it fine.
 	if [ x$(on_mac_os) = xyes ]; then
 	  export compiler="CC=clang"
+	  extra_pkgconf="--with-internal-glib lt_cv_deplibs_check_method=pass_all"
 	else
 	  export compiler=""
+	  extra_pkgconf="--with-internal-glib"
 	fi
-	extra_pkgconf="--with-internal-glib"
 	export CFLAGS="-std=$(std_c_old) $$CFLAGS"
 	$(call gbuild, pkg-config-$(pkgconfig-version), static, \
 		$$compiler $$extra_pkgconf \
