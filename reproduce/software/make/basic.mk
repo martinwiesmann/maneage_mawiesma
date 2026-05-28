@@ -434,10 +434,10 @@ $(ibidir)/pkg-config-$(pkgconfig-version): $(ibidir)/tar-$(tar-version)
 #	to force glib_have_carbon=no before the real configure runs.
 	if [ x$(on_mac_os) = xyes ]; then
 	  export compiler="CC=clang"
-	  case "$$(uname -m)" in
-	    arm64 | aarch64)
-	      CFLAGS="-Wno-int-conversion $$CFLAGS" ;;
-	  esac
+#	  The bundled glib's gatomic.c uses integer-to-pointer conversions
+#	  that newer Clang (Xcode 26+) treats as hard errors on all macOS
+#	  architectures.
+	  CFLAGS="-Wno-int-conversion $$CFLAGS"
 #	  On macOS the bundled glib detects Carbon via the C preprocessor
 #	  (Carbon/Carbon.h exists in the SDK) but Carbon cannot actually be
 #	  linked on ARM64 or with Xcode 26+.  Apply glib_have_carbon=no on
