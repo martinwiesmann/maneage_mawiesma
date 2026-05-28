@@ -436,14 +436,18 @@ $(ibidir)/pkg-config-$(pkgconfig-version): $(ibidir)/tar-$(tar-version)
 	  export compiler="CC=clang"
 	  case "$$(uname -m)" in
 	    arm64 | aarch64)
-	      CFLAGS="-Wno-int-conversion $$CFLAGS"
-	      pc_wrap=$$(mktemp /tmp/pkg-config-configure.XXXXXX)
-	      printf '#!/bin/sh\n' > $$pc_wrap
-	      printf 'sed -i.bak "s/^  glib_have_carbon=yes$$/  glib_have_carbon=no/" glib/configure\n' >> $$pc_wrap
-	      printf 'exec ./configure "$$@"\n' >> $$pc_wrap
-	      chmod +x $$pc_wrap ;;
-	    *) pc_wrap=./configure ;;
+	      CFLAGS="-Wno-int-conversion $$CFLAGS" ;;
 	  esac
+#	  On macOS the bundled glib detects Carbon via the C preprocessor
+#	  (Carbon/Carbon.h exists in the SDK) but Carbon cannot actually be
+#	  linked on ARM64 or with Xcode 26+.  Apply glib_have_carbon=no on
+#	  all macOS to avoid broken linker tests that prevent libglib-2.0.la
+#	  from being created.
+	  pc_wrap=$$(mktemp /tmp/pkg-config-configure.XXXXXX)
+	  printf '#!/bin/sh\n' > $$pc_wrap
+	  printf 'sed -i.bak "s/^  glib_have_carbon=yes$$/  glib_have_carbon=no/" glib/configure\n' >> $$pc_wrap
+	  printf 'exec ./configure "$$@"\n' >> $$pc_wrap
+	  chmod +x $$pc_wrap
 	else
 	  export compiler=""
 	  pc_wrap=./configure
